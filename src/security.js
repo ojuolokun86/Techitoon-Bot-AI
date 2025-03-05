@@ -1,6 +1,6 @@
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const config = require('../config/config');
-const supabase = require('../supabaseClient');
+const config = require('./config/config');
+const supabase = require('./supabaseClient');
 
 async function saveSuperadmin(groupId, userId) {
     await supabase
