@@ -1,11 +1,16 @@
 require('dotenv').config();
-const fetch = require('node-fetch');
 const challonge = require('challonge');
 const supabase = require('../supabaseClient');
 const { formatResponseWithHeaderFooter } = require('../utils/utils');
 const tesseract = require('tesseract.js');
 const fs = require('fs');
 const path = require('path');
+
+// Dynamic import for node-fetch
+let fetch;
+(async () => {
+    fetch = (await import('node-fetch')).default;
+})();
 
 // Challonge API Setup
 const challongeClient = challonge.createClient({
