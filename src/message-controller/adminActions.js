@@ -24,15 +24,23 @@ const clearChat = async (sock, chatId) => {
 };
 
 const tagAll = async (sock, chatId, message, sender) => {
-    const groupMetadata = await sock.groupMetadata(chatId);
-    const participants = groupMetadata.participants.map(p => p.id);
-    const mentions = participants.map(id => ({ id }));
+    try {
+        const groupMetadata = await sock.groupMetadata(chatId);
+        const participants = groupMetadata.participants.map(p => p.id);
+        const mentions = participants.map(id => ({ id }));
 
-    let text = `📌 *Group:* 『 ${groupMetadata.subject} 』\n`;
-    text += `👤 *User:* 『 @${sender.split('@')[0]} 』\n`;
-    text += `📝 *Message:* 『 ${message} 』\n\n`;
+        let text = `📌 *Group:* 『 ${groupMetadata.subject} 』\n`;
+        text += `👤 *User:* 『 @${sender.split('@')[0]} 』\n`;
+        text += `📝 *Message:* 『 ${message} 』\n\n`;
 
-    await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions });
+        // Add mentions to the message text with usernames in a single line
+        text += participants.map(id => `@${id.split('@')[0]}`).join(' ');
+
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions });
+    } catch (error) {
+        console.error('Error tagging all participants:', error);
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('⚠️ Could not tag all participants.') });
+    }
 };
 
 const startAnnouncement = async (sock, chatId, message) => {

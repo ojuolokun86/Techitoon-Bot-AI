@@ -15,7 +15,6 @@ const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
 const { startBot } = require('../bot/bot');
 
-
 const showAllGroupStats = async (sock, chatId) => {
     try {
         // Fetch group stats from Supabase
@@ -60,7 +59,21 @@ const handleCommand = async (sock, msg) => {
     } else if (messageText.startsWith('.antidelete off')) {
         await disableAntiDelete(chatId);
         await sendMessage(sock, chatId, '❌ Anti-delete has been disabled for this group.');
+    } else if (messageText.startsWith('.tagall')) {
+        const groupMetadata = await sock.groupMetadata(chatId);
+        const participants = groupMetadata.participants.map(p => p.id);
+        const mentions = participants.map(id => ({ id }));
+
+        let text = `📌 *Group:* 『 ${groupMetadata.subject} 』\n`;
+        text += `👤 *User:* 『 @${sender.split('@')[0]} 』\n`;
+        text += `📝 *Message:* 『 ${messageText.replace('.tagall', '').trim()} 』\n\n`;
+
+        // Add mentions to the message text with usernames in a single line
+        text += participants.map(id => `@${id.split('@')[0]}`).join(' ');
+
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions });
     }
+    // ...other command handling...
 };
 
 const handleIncomingMessages = async (sock, m) => {
@@ -129,364 +142,8 @@ const handleIncomingMessages = async (sock, m) => {
         // React to the command
         await sendReaction(sock, chatId, message.key.id, command);
 
-        // Check if the sender is an admin
-        const isAdmin = await checkIfAdmin(sock, chatId, sender);
-
-        switch (command) {
-            case 'antidelete':
-                if (sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only the bot owner can enable or disable the anti-delete feature.');
-                    console.log(`Unauthorized attempt to change anti-delete by ${sender}`);
-                    return;
-                }
-                if (args[0] === 'on' || args[0] === 'off') {
-                    if (args[0] === 'on') {
-                        await enableAntiDelete(chatId);
-                    } else {
-                        await disableAntiDelete(chatId);
-                    }
-                    await sendMessage(sock, chatId, `🔄 Anti-delete is now ${args[0]}.`);
-                } else {
-                    await sendMessage(sock, chatId, '❌ Invalid argument. Use "on" or "off".');
-                }
-                break;
-            case 'ping':
-                console.log('Sending pong message');
-                await sendMessage(sock, chatId, '🏓 Pong! Bot is active.');
-                break;
-            case 'menu':
-                await commonCommands.sendHelpMenu(sock, chatId, isGroup, isAdmin);
-                break;
-            case 'joke':
-                await commonCommands.sendJoke(sock, chatId);
-                break;
-            case 'quote':
-                await commonCommands.sendQuote(sock, chatId);
-                break;
-            case 'weather':
-                await botCommands.handleWeatherCommand(sock, message, args);
-                break;
-            case 'translate':
-                await botCommands.handleTranslateCommand(sock, message, args);
-                break;
-            case 'admin':
-                await commonCommands.listAdmins(sock, chatId);
-                break;
-            case 'info':
-                await commonCommands.sendGroupInfo(sock, chatId, sock.user.id);
-                break;
-            case 'rules':
-                await commonCommands.sendGroupRules(sock, chatId);
-                break;
-            case 'clear':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.clearChat(sock, chatId);
-                break;
-            case 'ban':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.banUser(sock, chatId, args, sender);
-                break;
-            case 'tagall':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const groupMetadata = await sock.groupMetadata(chatId);
-                const participants = groupMetadata.participants.map(p => p.id);
-                const mentions = participants.map(p => `@${p.split('@')[0]}`).join(' ');
-                const tagallMessage = `
-📢 *Tag All Command* 📢
-👤 *User*: @${sender.split('@')[0]}
-👥 *Group*: ${groupMetadata.subject}
-📝 *Message*: ${args.join(' ')}
-`;
-                await sendMessage(sock, chatId, tagallMessage, mentions);
-                break;
-            case 'mute':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.muteChat(sock, chatId);
-                break;
-            case 'unmute':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.unmuteChat(sock, chatId);
-                break;
-            case 'announce':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.startAnnouncement(sock, chatId, args.join(' '));
-                break;
-            case 'stopannounce':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.stopAnnouncement(sock, chatId);
-                break;
-            case 'schedule':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await scheduleCommands.scheduleMessage(sock, chatId, args);
-                break;
-            case 'remind':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await scheduleCommands.remind(sock, chatId, args);
-                break;
-            case 'cancelschedule':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await scheduleCommands.cancelSchedule(sock, chatId, args);
-                break;
-            case 'cancelreminder':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await scheduleCommands.cancelReminder(sock, chatId);
-                break;
-            case 'poll':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await pollCommands.createPoll(sock, chatId, args);
-                break;
-            case 'vote':
-                await pollCommands.vote(sock, chatId, args);
-                break;
-            case 'endpoll':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await pollCommands.endPoll(sock, chatId);
-                break;
-            case 'starttournament':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await tournamentCommands.startTournament(sock, chatId, args);
-                break;
-            case 'addteam':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await tournamentCommands.addTeam(sock, chatId, args);
-                break;
-            case 'register':
-                await tournamentCommands.registerUser(sock, chatId, args);
-                break;
-            case 'endtournament':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await tournamentCommands.endTournament(sock, chatId);
-                break;
-            case 'tournamentstatus':
-                await tournamentCommands.tournamentStatus(sock, chatId);
-                break;
-            case 'setgrouprules':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.setGroupRules(sock, chatId, args.join(' '));
-                break;
-            case 'settournamentrules':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.setTournamentRules(sock, chatId, args.join(' '));
-                break;
-            case 'setlanguage':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.setLanguage(sock, chatId, args.join(' '));
-                break;
-            case 'showstats':
-                await showAllGroupStats(sock, chatId);
-                break;
-            case 'delete':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.deleteMessage(sock, chatId, message);
-                break;
-            case 'enable':
-                if (sender === config.botOwnerId) {
-                    await adminCommands.enableBot(sock, chatId, sender);
-                } else {
-                    await sendMessage(sock, chatId, '❌ Only the bot owner can enable the bot.');
-                }
-                break;
-            case 'disable':
-                if (sender === config.botOwnerId) {
-                    await adminCommands.disableBot(sock, chatId, sender);
-                } else {
-                    await sendMessage(sock, chatId, '❌ Only the bot owner can disable the bot.');
-                }
-                break;
-            case 'startwelcome':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.startWelcome(sock, chatId);
-                break;
-            case 'stopwelcome':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                await adminCommands.stopWelcome(sock, chatId);
-                break;
-            case 'promote':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const promoteUserId = args[0].replace('@', '') + '@s.whatsapp.net';
-                console.log(`Promoting user: ${promoteUserId}`);
-                await adminCommands.promoteUser(sock, chatId, promoteUserId);
-                break;
-            case 'demote':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const demoteUserId = args[0].replace('@', '') + '@s.whatsapp.net';
-                console.log(`Demoting user: ${demoteUserId}`);
-                await adminCommands.demoteUser(sock, chatId, demoteUserId);
-                break;
-            case 'warn':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const userId = args[0].replace('@', '') + '@s.whatsapp.net';
-                if (userId === config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ You cannot warn the bot owner.');
-                    return;
-                }
-                const reason = args.slice(1).join(' ') || 'No reason provided';
-                await issueWarning(sock, chatId, userId, reason, config.warningThreshold.sales);
-                break;
-            case 'listwarn':
-                await listWarnings(sock, chatId);
-                break;
-            case 'resetwarn':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const resetUserId = args[0].replace('@', '') + '@s.whatsapp.net';
-                await resetWarnings(sock, chatId, resetUserId);
-                break;
-            case 'addcommand':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const [accessLevel, cmd, ...responseParts] = args;
-                const response = responseParts.join(' ');
-                await addCommand(sock, chatId, cmd, response, accessLevel);
-                break;
-            case 'deletecommand':
-                if (!isAdmin && sender !== config.botOwnerId) {
-                    await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-                    return;
-                }
-                const delCommand = args[0];
-                await deleteCommand(sock, chatId, delCommand);
-                break;
-            case 'startgoodbye':
-                if (!isAdmin) {
-                    await sendMessage(sock, chatId, '❌ Only admins can enable goodbye messages.');
-                    return;
-                }
-                await supabase
-                    .from('group_settings')
-                    .update({ goodbye_messages_enabled: true })
-                    .eq('group_id', chatId);
-                await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled.');
-                break;
-            case 'stopgoodbye':
-                if (!isAdmin) {
-                    await sendMessage(sock, chatId, '❌ Only admins can disable goodbye messages.');
-                    return;
-                }
-                await supabase
-                    .from('group_settings')
-                    .update({ goodbye_messages_enabled: false })
-                    .eq('group_id', chatId);
-                await sendMessage(sock, chatId, '✅ Goodbye messages have been disabled.');
-                break;
-            case 'clear chat':
-                try {
-                    console.log("Attempting to clear chat...");
-                    await sock.sendMessage(chatId, { delete: message.key }); // Delete the command itself
-                    await sock.sendMessage(chatId, { text: "🗑 Clearing entire chat (including media)..." });
-
-                    let deletedCount = 0;
-
-                    while (true) {
-                        const messages = await sock.loadMessages(chatId, 50); // Load 50 messages at a time
-
-                        if (messages.messages.length === 0) break; // Stop if no messages left
-
-                        for (const msg of messages.messages) {
-                            if (!msg.key.fromMe) { // Ensure bot doesn't delete its own messages
-                                await sock.sendMessage(chatId, { delete: msg.key });
-                                deletedCount++;
-                            }
-                        }
-                    }
-
-                    await sock.sendMessage(chatId, { text: `✅ Deleted ${deletedCount} messages (including media).` });
-                    console.log(`Cleared ${deletedCount} messages in: ${chatId}`);
-                } catch (error) {
-                    console.error("Error clearing chat:", error);
-                    await sock.sendMessage(chatId, { text: "❌ Failed to clear chat." });
-                }
-                break;
-            case 'addwinner':
-                const [league, team, username] = args.join(' ').split(',').map(s => s.trim());
-                await addWinner(sock, chatId, sender, league, team, username);
-                break;
-            case 'fame':
-                await showHallOfFame(sock, chatId);
-                break;
-            default:
-                console.log(`Unknown command: ${command}`);
-                await sendMessage(sock, chatId, '❌ Unknown command! Use .menu for commands list.');
-        }
+        // Handle the command
+        await handleCommand(sock, message);
 
         // Update user statistics for commands
         updateUserStats(sender, command);
@@ -497,6 +154,11 @@ const handleIncomingMessages = async (sock, m) => {
         if (error.message.includes('Bad MAC') || error.message.includes('No matching sessions found for message')) {
             console.error('Session error:', error);
             await sendMessage(sock, chatId, '⚠️ *Session error occurred. Please try again later.*');
+        } else if (error.message.includes('Timed Out')) {
+            console.error('Error fetching group metadata:', error);
+            await sendMessage(sock, chatId, '⚠️ *Request timed out. Please try again later.*');
+        } else {
+            await sendMessage(sock, chatId, '⚠️ *An unexpected error occurred. Please try again later.*');
         }
     }
 };

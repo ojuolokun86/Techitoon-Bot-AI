@@ -23,7 +23,7 @@ async function startBot(sock) {
 }
 
 const start = async () => {
-    const { state, saveCreds } = await useMultiFileAuthState(path.resolve('./auth_info_multi'));
+    const { state, saveCreds } = await useMultiFileAuthState(path.resolve('./auth_info'));
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: true,
