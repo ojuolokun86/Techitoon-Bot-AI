@@ -2,7 +2,7 @@ const config = require('../config/config');
 const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
 const supabase = require('../supabaseClient');
 const { startScheduler, stopScheduler } = require('../bot/scheduler');
-const { startBot } = require('../bot/bot')
+const { startBot } = require('../bot/bot');
 
 const scheduledMessages = [];
 const announcementIntervals = {};
@@ -33,9 +33,7 @@ const tagAll = async (sock, chatId, message, sender) => {
         text += `👤 *User:* 『 @${sender.split('@')[0]} 』\n`;
         text += `📝 *Message:* 『 ${message} 』\n\n`;
 
-        // Add mentions to the message text with usernames in a single line
-        text += participants.map(id => `@${id.split('@')[0]}`).join(' ');
-
+        // Send message with mentions but without usernames
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions });
     } catch (error) {
         console.error('Error tagging all participants:', error);
