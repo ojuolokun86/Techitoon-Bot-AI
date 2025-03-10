@@ -27,17 +27,20 @@ const tagAll = async (sock, chatId, message, sender) => {
     try {
         const groupMetadata = await sock.groupMetadata(chatId);
         const participants = groupMetadata.participants.map(p => p.id);
-        const mentions = participants.map(id => ({ id }));
 
-        let text = `📌 *Group:* 『 ${groupMetadata.subject} 』\n`;
-        text += `👤 *User:* 『 @${sender.split('@')[0]} 』\n`;
-        text += `📝 *Message:* 『 ${message} 』\n\n`;
+        let text = `│👥 Group : ${groupMetadata.subject}\n`;
+        text += `│👤 Hey😀 : @${sender.split('@')[0]}\n`;
+        text += `│📜 Message : *${message}*\n`;
+        text += `╰─────────────━┈⊷\n\n`;
 
-        // Send message with mentions but without usernames
-        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions });
+        // Add mentions to the text (actual mentions, not just text)
+        text += participants.map(id => `😟 @${id.split('@')[0]}`).join('\n');
+
+        // Send message with actual mentions
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions: participants });
     } catch (error) {
         console.error('Error tagging all participants:', error);
-        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('⚠️ Could not tag all participants.') });
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`⚠️ Could not tag all participants: ${error.message}`) });
     }
 };
 

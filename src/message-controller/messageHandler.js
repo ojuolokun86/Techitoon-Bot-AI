@@ -15,6 +15,8 @@ const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
 const { startBot } = require('../bot/bot');
 
+let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
+
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
@@ -32,16 +34,26 @@ const handleCommand = async (sock, msg) => {
             const participants = groupMetadata.participants.map(p => p.id);
             const mentions = participants.map(id => ({ id }));
 
-            let text = `📌 *Group:* 『 ${groupMetadata.subject} 』\n`;
-            text += `👤 *User:* 『 @${sender.split('@')[0]} 』\n`;
-            text += `📝 *Message:* 『 ${messageText.replace('.tagall', '').trim()} 』\n\n`;
+            let text = `│👥 Group : ${groupMetadata.subject}\n`;
+            text += `│👤 Hey😀 : @${sender.split('@')[0]}\n`;
+            text += `│📜 Message : *${messageText.replace('.tagall', '').trim()}*\n`;
+            text += `╰─────────────━┈⊷\n\n`;
 
-            // Send message with mentions but without usernames
-            await sock.sendMessage(chatId, { text, mentions });
+            // Add mentions to the text
+            text += participants.map(id => `😟 @${id.split('@')[0]}`).join('\n');
+
+            // Send message with mentions
+            await sock.sendMessage(chatId, { text, mentions: participants });
         } catch (error) {
             console.error('Error tagging all participants:', error);
-            await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('⚠️ Could not tag all participants.') });
+            await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`⚠️ Could not tag all participants: ${error.message}`) });
         }
+    } else if (messageText.startsWith('.stopgoodbye')) {
+        goodbyeMessagesEnabled = false;
+        await sendMessage(sock, chatId, '❌ Goodbye messages have been disabled for this group.');
+    } else if (messageText.startsWith('.startgoodbye')) {
+        goodbyeMessagesEnabled = true;
+        await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled for this group.');
     } else if (messageText.startsWith('.ping')) {
         await sendMessage(sock, chatId, '🏓 Pong!');
     } else if (messageText.startsWith('.menu')) {
@@ -310,7 +322,7 @@ const handleGroupParticipantsUpdate = async (sock, update) => {
             console.log(`👋 Sent welcome message to ${user}`);
         }
 
-        if ((update.action === 'remove' || update.action === 'leave') && groupSettings && groupSettings.goodbye_messages_enabled) {
+        if ((update.action === 'remove' || update.action === 'leave') && groupSettings && groupSettings.goodbye_messages_enabled && goodbyeMessagesEnabled) {
             let goodbyeMessage;
             if (update.action === 'remove') {
                 // Select a random removed message
@@ -476,4 +488,4 @@ const handlePollCommand = async (sock, msg) => {
     await pollCommands.createPoll(sock, chatId, question, options, sender);
 };
 
-module.exports = { handleIncomingMessages, handleNewParticipants, checkIfAdmin, handleGroupParticipantsUpdate, setupDebugging, addWinner, showHallOfFame, handlePollCommand };
+module.exports = { handleIncomingMessages, handleNewParticipants, checkIfAdmin, handleGroupParticipantsUpdate, setupDebugging, addWinner, showHallOfFame, handlePollCommand, handleCommand };
