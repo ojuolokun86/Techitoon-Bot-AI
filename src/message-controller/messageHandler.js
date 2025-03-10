@@ -22,7 +22,27 @@ const handleCommand = async (sock, msg) => {
     const sender = msg.key.participant || msg.key.remoteJid;
     const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
 
-    if (messageText.startsWith('.antidelete on')) {
+    if (messageText.startsWith('.warn')) {
+        const args = messageText.split(' ').slice(1);
+        const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        if (mentions.length === 0) {
+            await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+            return;
+        }
+        const userId = mentions[0];
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+        const warningThreshold = config.warningThreshold.default;
+        await issueWarning(sock, chatId, userId, reason, warningThreshold);
+    } else if (messageText.startsWith('.resetwarn')) {
+        const args = messageText.split(' ').slice(1);
+        const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        if (mentions.length === 0) {
+            await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+            return;
+        }
+        const userId = mentions[0];
+        await resetWarnings(sock, chatId, userId);
+    } else if (messageText.startsWith('.antidelete on')) {
         await enableAntiDelete(chatId);
         await sendMessage(sock, chatId, '✅ Anti-delete has been enabled for this group.');
     } else if (messageText.startsWith('.antidelete off')) {
@@ -49,10 +69,10 @@ const handleCommand = async (sock, msg) => {
             await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`⚠️ Could not tag all participants: ${error.message}`) });
         }
     } else if (messageText.startsWith('.stopgoodbye')) {
-        goodbyeMessagesEnabled = false;
+        config.botSettings.groupGoodbyeStatus[chatId] = false;
         await sendMessage(sock, chatId, '❌ Goodbye messages have been disabled for this group.');
     } else if (messageText.startsWith('.startgoodbye')) {
-        goodbyeMessagesEnabled = true;
+        config.botSettings.groupGoodbyeStatus[chatId] = true;
         await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled for this group.');
     } else if (messageText.startsWith('.ping')) {
         await sendMessage(sock, chatId, '🏓 Pong!');
@@ -148,14 +168,8 @@ const handleCommand = async (sock, msg) => {
     } else if (messageText.startsWith('.demote')) {
         const userId = messageText.split(' ')[1];
         await adminCommands.demoteUser(sock, chatId, userId);
-    } else if (messageText.startsWith('.warn')) {
-        const args = messageText.split(' ').slice(1);
-        await issueWarning(sock, chatId, args, sender);
     } else if (messageText.startsWith('.listwarn')) {
         await listWarnings(sock, chatId);
-    } else if (messageText.startsWith('.resetwarn')) {
-        const args = messageText.split(' ').slice(1);
-        await resetWarnings(sock, chatId, args);
     } else if (messageText.startsWith('.fame')) {
         await showHallOfFame(sock, chatId);
     } else if (messageText.startsWith('.sharelink')) {

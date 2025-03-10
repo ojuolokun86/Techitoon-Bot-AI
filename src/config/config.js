@@ -15,13 +15,15 @@ const config = {
         responseDelay: 1000, // Delay in milliseconds for bot responses //
         enabled: false, // Bot starts in disabled mode
         welcomeMessagesEnabled: false, // Welcome messages start off
+        goodbyeMessagesEnabled: false, // Goodbye messages start off
         groupStatus: {}, // Track bot enabled status for each group
-        groupWelcomeStatus: {} // Track welcome message status for each group
+        groupWelcomeStatus: {}, // Track welcome message status for each group
+        groupGoodbyeStatus: {} // Track goodbye message status for each group
     },
     warningThreshold: {
-        sales: 2, // Warning threshold for sales content
-        links: 3  // Warning threshold for links
-
+        default: 3, // Default warning threshold
+        sales: 2,   // Warning threshold for sales content
+        links: 3    // Warning threshold for links
     },
     database: {
         url: process.env.SUPABASE_URL,

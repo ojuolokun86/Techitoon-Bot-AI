@@ -14,7 +14,6 @@ const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
 const { startBot } = require('../bot/bot');
 
-
 const salesKeywords = [
     'sell', 'sale', 'selling', 'buy', 'buying', 'trade', 'trading', 'swap', 'swapping', 'exchange', 'price',
     'available for sale', 'dm for price', 'account for sale', 'selling my account', 'who wants to buy', 'how much?',
@@ -53,13 +52,21 @@ const handleProtectionMessages = async (sock, message) => {
 
         console.log(`Checking message for protection: ${msgText} from ${sender} in ${chatId}`);
 
-        // Get group metadata to check admin status
+        // Get group metadata to check admin status with retry mechanism
         let groupMetadata;
-        try {
-            groupMetadata = await sock.groupMetadata(chatId);
-        } catch (error) {
-            console.error('Error fetching group metadata:', error);
-            return;
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                groupMetadata = await sock.groupMetadata(chatId);
+                break; // Break if successful
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    console.error('Error fetching group metadata after multiple attempts:', error);
+                    // Log the error instead of sending it to the chat
+                    return;
+                }
+                console.log(`Retrying to fetch group metadata (Attempt ${attempt}/${maxRetries})...`);
+            }
         }
 
         const isAdmin = groupMetadata.participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
