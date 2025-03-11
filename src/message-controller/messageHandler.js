@@ -17,6 +17,20 @@ const { startBot } = require('../bot/bot');
 
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
 
+const isAdminOrOwner = async (sock, chatId, sender) => {
+    const groupMetadata = await sock.groupMetadata(chatId);
+    const participants = groupMetadata.participants;
+    
+    console.log("Participants:", participants); // Debugging log
+
+    const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+    const isOwner = sender === config.botOwnerId;
+
+    console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
+
+    return isAdmin || isOwner;
+};
+
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
@@ -49,29 +63,23 @@ const handleCommand = async (sock, msg) => {
         await disableAntiDelete(chatId);
         await sendMessage(sock, chatId, '❌ Anti-delete has been disabled for this group.');
     } else if (messageText.startsWith('.tagall')) {
-        try {
-            const groupMetadata = await sock.groupMetadata(chatId);
-            const participants = groupMetadata.participants.map(p => p.id);
-            const mentions = participants.map(id => ({ id }));
-
-            let text = `│👥 Group : ${groupMetadata.subject}\n`;
-            text += `│👤 Hey😀 : @${sender.split('@')[0]}\n`;
-            text += `│📜 Message : *${messageText.replace('.tagall', '').trim()}*\n`;
-            text += `╰─────────────━┈⊷\n\n`;
-
-            // Add mentions to the text
-            text += participants.map(id => `😟 @${id.split('@')[0]}`).join('\n');
-
-            // Send message with mentions
-            await sock.sendMessage(chatId, { text, mentions: participants });
-        } catch (error) {
-            console.error('Error tagging all participants:', error);
-            await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`⚠️ Could not tag all participants: ${error.message}`) });
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
         }
+        await adminCommands.tagAll(sock, chatId, messageText.replace('.tagall', '').trim(), sender);
     } else if (messageText.startsWith('.stopgoodbye')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         config.botSettings.groupGoodbyeStatus[chatId] = false;
         await sendMessage(sock, chatId, '❌ Goodbye messages have been disabled for this group.');
     } else if (messageText.startsWith('.startgoodbye')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         config.botSettings.groupGoodbyeStatus[chatId] = true;
         await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled for this group.');
     } else if (messageText.startsWith('.ping')) {
@@ -95,19 +103,43 @@ const handleCommand = async (sock, msg) => {
     } else if (messageText.startsWith('.info')) {
         await commonCommands.sendGroupInfo(sock, chatId, sock.user.id);
     } else if (messageText.startsWith('.clear')) {
-        await adminCommands.clearChat(sock, chatId);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        await adminCommands.clearChat(sock, chatId, sender);
     } else if (messageText.startsWith('.ban')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const args = messageText.split(' ').slice(1);
         await adminCommands.banUser(sock, chatId, args, sender);
     } else if (messageText.startsWith('.mute')) {
-        await adminCommands.muteChat(sock, chatId);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        await adminCommands.muteChat(sock, chatId, sender);
     } else if (messageText.startsWith('.unmute')) {
-        await adminCommands.unmuteChat(sock, chatId);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        await adminCommands.unmuteChat(sock, chatId, sender);
     } else if (messageText.startsWith('.announce')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const message = messageText.replace('.announce', '').trim();
-        await adminCommands.startAnnouncement(sock, chatId, message);
+        await adminCommands.startAnnouncement(sock, chatId, message, sender);
     } else if (messageText.startsWith('.stopannounce')) {
-        await adminCommands.stopAnnouncement(sock, chatId);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        await adminCommands.stopAnnouncement(sock, chatId, sender);
     } else if (messageText.startsWith('.schedule')) {
         const message = messageText.replace('.schedule', '').trim();
         await scheduleCommands.scheduleMessage(sock, chatId, message);
@@ -142,32 +174,72 @@ const handleCommand = async (sock, msg) => {
     } else if (messageText.startsWith('.tournamentstatus')) {
         await tournamentCommands.tournamentStatus(sock, chatId);
     } else if (messageText.startsWith('.setgrouprules')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const args = messageText.split(' ').slice(1);
-        await adminCommands.setGroupRules(sock, chatId, args.join(' '));
+        await adminCommands.setGroupRules(sock, chatId, args.join(' '), sender);
     } else if (messageText.startsWith('.settournamentrules')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const args = messageText.split(' ').slice(1);
-        await adminCommands.setTournamentRules(sock, chatId, args.join(' '));
+        await adminCommands.setTournamentRules(sock, chatId, args.join(' '), sender);
     } else if (messageText.startsWith('.setlanguage')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const args = messageText.split(' ').slice(1);
-        await adminCommands.setLanguage(sock, chatId, args.join(' '));
+        await adminCommands.setLanguage(sock, chatId, args.join(' '), sender);
     } else if (messageText.startsWith('.showstats')) {
         await showGroupStats(sock, chatId);
     } else if (messageText.startsWith('.delete')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         await adminCommands.deleteMessage(sock, chatId, message);
     } else if (messageText.startsWith('.enable')) {
+        if (sender !== config.botOwnerId) {
+            await sendMessage(sock, chatId, '❌ Only the bot owner can use this command.');
+            return;
+        }
         await adminCommands.enableBot(sock, chatId, sender);
     } else if (messageText.startsWith('.disable')) {
+        if (sender !== config.botOwnerId) {
+            await sendMessage(sock, chatId, '❌ Only the bot owner can use this command.');
+            return;
+        }
         await adminCommands.disableBot(sock, chatId, sender);
     } else if (messageText.startsWith('.startwelcome')) {
-        await adminCommands.startWelcome(sock, chatId);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        await adminCommands.startWelcome(sock, chatId, sender);
     } else if (messageText.startsWith('.stopwelcome')) {
-        await adminCommands.stopWelcome(sock, chatId);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        await adminCommands.stopWelcome(sock, chatId, sender);
     } else if (messageText.startsWith('.promote')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const userId = messageText.split(' ')[1];
-        await adminCommands.promoteUser(sock, chatId, userId);
+        await adminCommands.promoteUser(sock, chatId, userId, sender);
     } else if (messageText.startsWith('.demote')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const userId = messageText.split(' ')[1];
-        await adminCommands.demoteUser(sock, chatId, userId);
+        await adminCommands.demoteUser(sock, chatId, userId, sender);
     } else if (messageText.startsWith('.listwarn')) {
         await listWarnings(sock, chatId);
     } else if (messageText.startsWith('.fame')) {

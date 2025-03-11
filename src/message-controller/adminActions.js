@@ -7,7 +7,26 @@ const { startBot } = require('../bot/bot');
 const scheduledMessages = [];
 const announcementIntervals = {};
 
-const clearChat = async (sock, chatId) => {
+const isAdminOrOwner = async (sock, chatId, sender) => {
+    const groupMetadata = await sock.groupMetadata(chatId);
+    const participants = groupMetadata.participants;
+    
+    console.log("Participants:", participants); // Debugging log
+
+    const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+    const isOwner = sender === config.botOwnerId;
+
+    console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
+
+    return isAdmin || isOwner;
+};
+
+const clearChat = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         console.log("Attempting to clear chat...");
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter("🗑 Clearing entire chat (including media)...") });
@@ -24,6 +43,11 @@ const clearChat = async (sock, chatId) => {
 };
 
 const tagAll = async (sock, chatId, message, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         const groupMetadata = await sock.groupMetadata(chatId);
         const participants = groupMetadata.participants.map(p => p.id);
@@ -44,7 +68,12 @@ const tagAll = async (sock, chatId, message, sender) => {
     }
 };
 
-const startAnnouncement = async (sock, chatId, message) => {
+const startAnnouncement = async (sock, chatId, message, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`📢 Announcement:\n\n${message}`) });
 
@@ -61,7 +90,12 @@ const startAnnouncement = async (sock, chatId, message) => {
     }
 };
 
-const stopAnnouncement = async (sock, chatId) => {
+const stopAnnouncement = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         // Clear the announcement interval
         if (announcementIntervals[chatId]) {
@@ -76,7 +110,12 @@ const stopAnnouncement = async (sock, chatId) => {
     }
 };
 
-const muteChat = async (sock, chatId) => {
+const muteChat = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         await sock.groupSettingUpdate(chatId, 'announcement');
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('🔇 Group has been muted.') });
@@ -86,7 +125,12 @@ const muteChat = async (sock, chatId) => {
     }
 };
 
-const unmuteChat = async (sock, chatId) => {
+const unmuteChat = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         await sock.groupSettingUpdate(chatId, 'not_announcement');
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('🔊 Group has been unmuted.') });
@@ -151,19 +195,16 @@ const setLanguage = async (sock, chatId, language, sender) => {
 };
 
 const banUser = async (sock, chatId, args, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     if (args.length > 0) {
         const userToBan = args[0].replace('@', '') + "@s.whatsapp.net";
 
-        // Check if the sender is an admin
-        const groupMetadata = await sock.groupMetadata(chatId);
-        const isAdmin = groupMetadata.participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
-
-        if (!isAdmin && sender !== config.botOwnerId) {
-            await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
-            return;
-        }
-
         // Check if the bot is an admin
+        const groupMetadata = await sock.groupMetadata(chatId);
         const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
         const isBotAdmin = groupMetadata.participants.some(p => p.id === botNumber && (p.admin === 'admin' || p.admin === 'superadmin'));
 
@@ -186,13 +227,23 @@ const banUser = async (sock, chatId, args, sender) => {
 };
 
 const deleteMessage = async (sock, chatId, msg) => {
+    if (!await isAdminOrOwner(sock, chatId, msg.key.participant || msg.key.remoteJid)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     if (msg.message.extendedTextMessage && msg.message.extendedTextMessage.contextInfo) {
         const messageId = msg.message.extendedTextMessage.contextInfo.stanzaId;
         await sock.sendMessage(chatId, { delete: { id: messageId, remoteJid: chatId, fromMe: false } });
     }
 };
 
-const startWelcome = async (sock, chatId) => {
+const startWelcome = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     const { data, error } = await supabase
         .from('group_settings')
         .upsert({ group_id: chatId, welcome_messages_enabled: true }, { onConflict: 'group_id' });
@@ -205,7 +256,12 @@ const startWelcome = async (sock, chatId) => {
     }
 };
 
-const stopWelcome = async (sock, chatId) => {
+const stopWelcome = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     const { data, error } = await supabase
         .from('group_settings')
         .upsert({ group_id: chatId, welcome_messages_enabled: false }, { onConflict: 'group_id' });
@@ -218,7 +274,12 @@ const stopWelcome = async (sock, chatId) => {
     }
 };
 
-const startGoodbye = async (sock, chatId) => {
+const startGoodbye = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     const { data, error } = await supabase
         .from('group_settings')
         .upsert({ group_id: chatId, goodbye_messages_enabled: true }, { onConflict: 'group_id' });
@@ -231,7 +292,12 @@ const startGoodbye = async (sock, chatId) => {
     }
 };
 
-const stopGoodbye = async (sock, chatId) => {
+const stopGoodbye = async (sock, chatId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     const { data, error } = await supabase
         .from('group_settings')
         .upsert({ group_id: chatId, goodbye_messages_enabled: false }, { onConflict: 'group_id' });
@@ -294,7 +360,12 @@ const disableBot = async (sock, chatId, sender) => {
     }
 };
 
-const promoteUser = async (sock, chatId, userId) => {
+const promoteUser = async (sock, chatId, userId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         await sock.groupParticipantsUpdate(chatId, [userId], 'promote');
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`✅ User @${userId.split('@')[0]} has been promoted.`) });
@@ -304,7 +375,12 @@ const promoteUser = async (sock, chatId, userId) => {
     }
 };
 
-const demoteUser = async (sock, chatId, userId) => {
+const demoteUser = async (sock, chatId, userId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
     try {
         await sock.groupParticipantsUpdate(chatId, [userId], 'demote');
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`❌ User @${userId.split('@')[0]} has been demoted.`) });
