@@ -2,7 +2,26 @@ const { sendMessage } = require('../utils/messageUtils');
 const supabase = require('../supabaseClient');
 const config = require('../config/config');
 
-const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
+const isAdminOrOwner = async (sock, chatId, sender) => {
+    const groupMetadata = await sock.groupMetadata(chatId);
+    const participants = groupMetadata.participants;
+    
+    console.log("Participants:", participants); // Debugging log
+
+    const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+    const isOwner = sender === config.botOwnerId;
+
+    console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
+
+    return isAdmin || isOwner;
+};
+
+const issueWarning = async (sock, chatId, userId, reason, warningThreshold, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+        return;
+    }
+
     try {
         if (typeof userId !== 'string' || userId === chatId) {
             console.error('Error: Invalid user ID:', userId);
@@ -59,7 +78,12 @@ const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
     }
 };
 
-const resetWarnings = async (sock, chatId, userId) => {
+const resetWarnings = async (sock, chatId, userId, sender) => {
+    if (!await isAdminOrOwner(sock, chatId, sender)) {
+        await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+        return;
+    }
+
     try {
         if (typeof userId !== 'string' || userId === chatId) {
             console.error('Error: Invalid user ID:', userId);

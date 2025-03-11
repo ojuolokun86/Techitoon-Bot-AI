@@ -43,6 +43,8 @@ const start = async () => {
             logInfo('Techitoon Bot is ready!');
             startBot(sock);
             resetOldWarnings(sock); // Start the scheduled job
+        } else if (update.qr) {
+            console.log('Connection update:', update);
         }
     });
 
