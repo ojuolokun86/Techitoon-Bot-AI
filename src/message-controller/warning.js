@@ -2,33 +2,8 @@ const { sendMessage } = require('../utils/messageUtils');
 const supabase = require('../supabaseClient');
 const config = require('../config/config');
 
-const isAdminOrOwner = async (sock, chatId, sender) => {
-    const groupMetadata = await sock.groupMetadata(chatId);
-    const participants = groupMetadata.participants;
-    
-    console.log("Participants:", participants); // Debugging log
-
-    const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
-    const isOwner = sender === config.botOwnerId;
-
-    console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
-
-    return isAdmin || isOwner;
-};
-
-const issueWarning = async (sock, chatId, userId, reason, warningThreshold, sender) => {
-    if (!await isAdminOrOwner(sock, chatId, sender)) {
-        await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-        return;
-    }
-
+const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
     try {
-        if (typeof userId !== 'string' || userId === chatId) {
-            console.error('Error: Invalid user ID:', userId);
-            await sendMessage(sock, chatId, '⚠️ Error: Invalid user ID.');
-            return;
-        }
-
         // Fetch current warning count
         const { data: existingWarnings, error: fetchError } = await supabase
             .from('warnings')
@@ -78,19 +53,8 @@ const issueWarning = async (sock, chatId, userId, reason, warningThreshold, send
     }
 };
 
-const resetWarnings = async (sock, chatId, userId, sender) => {
-    if (!await isAdminOrOwner(sock, chatId, sender)) {
-        await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
-        return;
-    }
-
+const resetWarnings = async (sock, chatId, userId) => {
     try {
-        if (typeof userId !== 'string' || userId === chatId) {
-            console.error('Error: Invalid user ID:', userId);
-            await sendMessage(sock, chatId, '⚠️ Error: Invalid user ID.');
-            return;
-        }
-
         const { error } = await supabase
             .from('warnings')
             .delete()
@@ -144,11 +108,6 @@ const listWarnings = async (sock, chatId) => {
 
 const getRemainingWarnings = async (chatId, userId, reason) => {
     try {
-        if (typeof userId !== 'string' || userId === chatId) {
-            console.error('Error: Invalid user ID:', userId);
-            return null;
-        }
-
         const { data: existingWarnings, error } = await supabase
             .from('warnings')
             .select('*')

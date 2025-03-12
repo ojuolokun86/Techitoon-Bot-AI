@@ -21,6 +21,16 @@ const isAdminOrOwner = async (sock, chatId, sender) => {
     return isAdmin || isOwner;
 };
 
+const isBotAdmin = async (sock, chatId) => {
+    const groupMetadata = await sock.groupMetadata(chatId);
+    const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+    const isAdmin = groupMetadata.participants.some(p => p.id === botNumber && (p.admin === 'admin' || p.admin === 'superadmin'));
+
+    console.log(`Checking Bot Admin Status - Bot Number: ${botNumber}, Is Admin: ${isAdmin}`);
+
+    return isAdmin;
+};
+
 const clearChat = async (sock, chatId, sender) => {
     if (!await isAdminOrOwner(sock, chatId, sender)) {
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
@@ -366,6 +376,11 @@ const promoteUser = async (sock, chatId, userId, sender) => {
         return;
     }
 
+    if (!await isBotAdmin(sock, chatId)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ The bot needs to be an admin to perform this action.') });
+        return;
+    }
+
     try {
         await sock.groupParticipantsUpdate(chatId, [userId], 'promote');
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(`✅ User @${userId.split('@')[0]} has been promoted.`) });
@@ -378,6 +393,11 @@ const promoteUser = async (sock, chatId, userId, sender) => {
 const demoteUser = async (sock, chatId, userId, sender) => {
     if (!await isAdminOrOwner(sock, chatId, sender)) {
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
+        return;
+    }
+
+    if (!await isBotAdmin(sock, chatId)) {
+        await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ The bot needs to be an admin to perform this action.') });
         return;
     }
 

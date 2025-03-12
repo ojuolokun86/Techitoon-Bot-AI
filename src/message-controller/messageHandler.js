@@ -18,44 +18,88 @@ const { startBot } = require('../bot/bot');
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
 
 const isAdminOrOwner = async (sock, chatId, sender) => {
-    const groupMetadata = await sock.groupMetadata(chatId);
-    const participants = groupMetadata.participants;
-    
-    console.log("Participants:", participants); // Debugging log
+    try {
+        const groupMetadata = await sock.groupMetadata(chatId);
+        const participants = groupMetadata.participants;
 
-    const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
-    const isOwner = sender === config.botOwnerId;
+        console.log("Participants:", participants); // Debugging log
 
-    console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
+        const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+        const isOwner = sender === config.botOwnerId;
 
-    return isAdmin || isOwner;
+        console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
+
+        return isAdmin || isOwner;
+    } catch (error) {
+        console.error('Error fetching admin status:', error);
+        return false;
+    }
 };
 
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
-    const sender = msg.key.participant || msg.key.remoteJid;
-    const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+    const sender = msg.key.participant || msg.key.remoteJid; // Get the sender's ID
+    const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
     if (messageText.startsWith('.warn')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ You must be an admin to issue warnings.');
+            return;
+        }
+
         const args = messageText.split(' ').slice(1);
         const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        
         if (mentions.length === 0) {
             await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
             return;
         }
+
         const userId = mentions[0];
         const reason = args.slice(1).join(' ') || 'No reason provided';
         const warningThreshold = config.warningThreshold.default;
+
         await issueWarning(sock, chatId, userId, reason, warningThreshold);
     } else if (messageText.startsWith('.resetwarn')) {
-        const args = messageText.split(' ').slice(1);
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ You must be an admin to reset warnings.');
+            return;
+        }
+
+        const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        
+        if (mentions.length === 0) {
+            await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+            return;
+        }
+
+        const userId = mentions[0];
+
+        await resetWarnings(sock, chatId, userId);
+    } else if (messageText.startsWith('.promote')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
         const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
         if (mentions.length === 0) {
             await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
             return;
         }
         const userId = mentions[0];
-        await resetWarnings(sock, chatId, userId);
+        await adminCommands.promoteUser(sock, chatId, userId, sender);
+    } else if (messageText.startsWith('.demote')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+            return;
+        }
+        const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        if (mentions.length === 0) {
+            await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+            return;
+        }
+        const userId = mentions[0];
+        await adminCommands.demoteUser(sock, chatId, userId, sender);
     } else if (messageText.startsWith('.antidelete on')) {
         await enableAntiDelete(chatId);
         await sendMessage(sock, chatId, '✅ Anti-delete has been enabled for this group.');
@@ -231,14 +275,24 @@ const handleCommand = async (sock, msg) => {
             await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
             return;
         }
-        const userId = messageText.split(' ')[1];
+        const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        if (mentions.length === 0) {
+            await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+            return;
+        }
+        const userId = mentions[0];
         await adminCommands.promoteUser(sock, chatId, userId, sender);
     } else if (messageText.startsWith('.demote')) {
         if (!await isAdminOrOwner(sock, chatId, sender)) {
             await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
             return;
         }
-        const userId = messageText.split(' ')[1];
+        const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        if (mentions.length === 0) {
+            await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+            return;
+        }
+        const userId = mentions[0];
         await adminCommands.demoteUser(sock, chatId, userId, sender);
     } else if (messageText.startsWith('.listwarn')) {
         await listWarnings(sock, chatId);
