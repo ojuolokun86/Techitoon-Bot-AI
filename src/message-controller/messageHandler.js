@@ -36,6 +36,27 @@ const isAdminOrOwner = async (sock, chatId, sender) => {
     }
 };
 
+const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) => {
+    console.log(`Saving message to database: chatId=${chatId}, messageId=${messageId}, sender=${sender}, messageContent=${messageContent}`);
+    const { error } = await supabase
+        .from('anti_delete_messages')
+        .insert([
+            { 
+                chat_id: chatId, 
+                message_id: messageId, 
+                sender: sender, 
+                message_content: messageContent, 
+                timestamp: new Date().toISOString() // Add timestamp
+            }
+        ]);
+
+    if (error) {
+        console.error('Error saving message to database:', error);
+    } else {
+        console.log('Message saved successfully');
+    }
+};
+
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid; // Get the sender's ID
@@ -318,6 +339,9 @@ const handleIncomingMessages = async (sock, m) => {
         const isBackupNumber = sender === config.backupNumber;
 
         console.log(`Received message: ${msgText} from ${sender} in ${chatId}`);
+
+        // Save message to database
+        await saveMessageToDatabase(chatId, message.key.id, sender, msgText);
 
         // Fetch group/channel settings from Supabase
         let groupSettings = null;

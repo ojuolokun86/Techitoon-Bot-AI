@@ -3,6 +3,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const { logInfo, logError } = require('./utils/logger');
 const { handleIncomingMessages, handleGroupParticipantsUpdate } = require('./message-controller/messageHandler');
 const { startSecurityBot } = require('./security');
+const { startScheduledMessageChecker } = require('./message-controller/scheduleMessage'); // Import the function
 const config = require('./config/config');
 const supabase = require('./supabaseClient');
 const { delay } = require('@whiskeysockets/baileys/lib/Utils/generics');
@@ -66,6 +67,7 @@ async function connectToWhatsApp(retryCount = 5) {
                     logInfo('Techitoon Bot is ready!');
                     startMainBot(sock);
                     startSecurityBot(sock);
+                    startScheduledMessageChecker(sock); // Start the scheduled message checker
                 } else if (connection === 'connecting') {
                     console.log('Connecting to WhatsApp...');
                 } else if (connection === 'qr') {

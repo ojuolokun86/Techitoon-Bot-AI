@@ -134,14 +134,23 @@ const disableAntiDelete = async (chatId) => {
 };
 
 const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) => {
+    console.log(`Saving message to database: chatId=${chatId}, messageId=${messageId}, sender=${sender}, messageContent=${messageContent}`);
     const { error } = await supabase
         .from('anti_delete_messages')
         .insert([
-            { chat_id: chatId, message_id: messageId, sender: sender, message_content: messageContent }
+            { 
+                chat_id: chatId, 
+                message_id: messageId, 
+                sender: sender, 
+                message_content: messageContent, 
+                timestamp: new Date().toISOString() // Add timestamp
+            }
         ]);
 
     if (error) {
         console.error('Error saving message to database:', error);
+    } else {
+        console.log('Message saved successfully');
     }
 };
 
@@ -150,11 +159,8 @@ const handleAntiDelete = async (sock, message, botNumber) => {
     const sender = message.key.participant || message.key.remoteJid;
 
     if (message.messageStubType === 'message_revoke_for_everyone' && sender !== botNumber) {
-        const deletedMessageKey = message.messageProtocolContextInfo?.stanzaId;
-        if (!deletedMessageKey) {
-            console.log("No stanzaId found");
-            return;
-        }
+        console.log("Deleted message data:", message);
+        const deletedMessageKey = message.messageProtocolContextInfo?.stanzaId || message.key.id;
 
         console.log(`🛑 Message deleted in ${chatId} by ${sender}`);
 
@@ -166,8 +172,11 @@ const handleAntiDelete = async (sock, message, botNumber) => {
             .eq('message_id', deletedMessageKey)
             .single();
 
-        if (error || !data) {
-            console.log("⚠️ Message not found in database. Cannot restore.");
+        if (error) {
+            console.error("Error fetching deleted message:", error);
+        }
+        if (!data) {
+            console.log("⚠️ No deleted message found for ID:", deletedMessageKey);
             return;
         }
 
@@ -193,19 +202,39 @@ function initializeMessageCache(sock) {
             const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
             if (!messageText) return; // Ignore unsupported message types
 
-            // Check if anti-delete is enabled in the group
+            // Check if the message is a deleted message
+            if (messageText.toLowerCase().includes("this message was deleted")) {
+                console.log("Ignoring deleted message");
+                return; // Skip processing
+            }
+
+            console.log(`Processing message: chatId=${chatId}, messageId=${messageId}, sender=${sender}, messageText=${messageText}`);
+
+            // Check if anti-delete is enabled in the group or if it's a private chat
             const { data, error } = await supabase
                 .from('anti_delete_groups')
                 .select('chat_id')
                 .eq('chat_id', chatId)
                 .single();
 
-            if (error && error.code !== "PGRST116") return; // Ignore missing row error
+            if (error) {
+                console.error('Error checking anti-delete status:', error);
+                return;
+            }
 
             // Store messages if (1) it's a private chat or (2) anti-delete is enabled in the group
-            if (chatId.includes("@g.us") && !data) return; // Skip if not enabled in group
+            if (!chatId.includes("@g.us") || data) {
+                await saveMessageToDatabase(chatId, messageId, sender, messageText);
+            }
+        }
+    });
 
-            await saveMessageToDatabase(chatId, messageId, sender, messageText);
+    // Listen for message deletions
+    sock.ev.on("messages.update", async (update) => {
+        for (const msg of update) {
+            if (msg.messageStubType === "message_revoke_for_everyone") {
+                await handleAntiDelete(sock, msg, sock.user.id);
+            }
         }
     });
 }

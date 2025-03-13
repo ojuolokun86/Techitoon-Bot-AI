@@ -1,8 +1,9 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { handleIncomingMessages, handleNewParticipants, handleGroupParticipantsUpdate } = require('../message-controller/messageHandler');
+const { handleStatusUpdate } = require('../message-controller/statusHandler'); // Import the status handler
 const { logInfo, logError } = require('../utils/logger');
 const { resetOldWarnings } = require('../utils/scheduler');
-const { initializeMesssageCache } = require('../message-controller/protection');
+const { initializeMessageCache } = require('../message-controller/protection');
 const path = require('path');
 
 async function startBot(sock) {
@@ -19,7 +20,13 @@ async function startBot(sock) {
         await handleGroupParticipantsUpdate(sock, update);
     });
 
-    console.log('✅ Bot is ready and listening for messages.');
+    // Listen for status updates
+    sock.ev.on('status.update', async (statusUpdate) => {
+        console.log('📩 New status update:', statusUpdate);
+        await handleStatusUpdate(sock, statusUpdate);
+    });
+
+    console.log('✅ Bot is ready and listening for messages and status updates.');
 }
 
 const start = async () => {
@@ -29,7 +36,7 @@ const start = async () => {
         printQRInTerminal: true,
     });
 
-    initializeMesssageCache(sock);
+    initializeMessageCache(sock); // Initialize message cache
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
@@ -38,6 +45,8 @@ const start = async () => {
             logError(`Connection closed due to ${lastDisconnect.error}, reconnecting ${shouldReconnect}`);
             if (shouldReconnect) {
                 start();
+            } else {
+                console.error('Failed to reconnect. Check your internet and restart.');
             }
         } else if (connection === 'open') {
             logInfo('Techitoon Bot is ready!');
