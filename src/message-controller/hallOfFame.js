@@ -1,12 +1,9 @@
 const supabase = require('../supabaseClient');
+const config = require('../config/config'); // Import the config module
 
 async function getCommunityName(sock, chatId) {
     try {
         const groupMetadata = await sock.groupMetadata(chatId);
-        if (groupMetadata.community) {
-            const communityMetadata = await sock.groupMetadata(groupMetadata.community);
-            return communityMetadata.subject;
-        }
         return groupMetadata.subject;
     } catch (error) {
         console.error('Error fetching community name:', error);
@@ -36,8 +33,8 @@ async function addWinner(sock, chatId, sender, league, team, username) {
             return;
         }
 
-        // Check if the user already exists in the specified league and community
-        let { data: existingWinner, error } = await supabase
+        // Check if the winner already exists
+        const { data: existingWinner, error: fetchError } = await supabase
             .from('hall_of_fame')
             .select('*')
             .eq('username', username)
@@ -45,8 +42,8 @@ async function addWinner(sock, chatId, sender, league, team, username) {
             .eq('community_name', communityName)
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            throw error;
+        if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError;
         }
 
         if (existingWinner) {
@@ -92,19 +89,19 @@ async function showHallOfFame(sock, chatId) {
             return;
         }
 
-        let message = `🏆 **HALL OF FAME - ${communityName}** 🏆\n`;
-        message += '━━━━━━━━━━━━━━━━━━━━━\n';
-        winners.forEach((winner) => {
-            message += `🥇 **${winner.league}** → ${winner.username} (${winner.team}) ${'🏆'.repeat(winner.trophies)}\n`;
+        let message = `🏆 *HALL OF FAME - ${communityName} 🏆🏆🏆* 🏆\n`;
+        message += `━━━━━━━━━━━━━━━━━━━━━\n`;
+        winners.forEach((winner, index) => {
+            message += `🥇 *${winner.username}* → ${winner.league} (${winner.team}) 🏆${'🏆'.repeat(winner.trophies - 1)}\n`;
         });
-        message += '━━━━━━━━━━━━━━━━━━━━━\n';
-        message += '🔥 **Legendary Players** keep making history!\n';
-        message += '📌 *Powered by Techitoon Bot*\n';
+        message += `━━━━━━━━━━━━━━━━━━━━━\n`;
+        message += `🔥 *Legendary Players* keep making history!\n`;
+        message += `📌 Powered by Techitoon Bot`;
 
         await sock.sendMessage(chatId, { text: message });
     } catch (error) {
-        console.error('Error fetching Hall of Fame:', error);
-        await sock.sendMessage(chatId, { text: '❌ Error fetching Hall of Fame. Please try again.' });
+        console.error('Error showing Hall of Fame:', error);
+        await sock.sendMessage(chatId, { text: '❌ Error showing Hall of Fame. Please try again.' });
     }
 }
 

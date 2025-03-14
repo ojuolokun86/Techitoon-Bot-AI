@@ -10,6 +10,7 @@ const scheduleCommands = require('../message-controller/scheduleMessage');
 const pollCommands = require('../message-controller/polls');
 const tournamentCommands = require('../message-controller/tournament');
 const { handleProtectionMessages, handleAntiDelete, enableAntiDelete, disableAntiDelete } = require('../message-controller/protection');
+const { addWinner, showHallOfFame } = require('../message-controller/hallOfFame');
 const { exec } = require("child_process");
 const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
@@ -62,7 +63,20 @@ const handleCommand = async (sock, msg) => {
     const sender = msg.key.participant || msg.key.remoteJid; // Get the sender's ID
     const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
-    if (messageText.startsWith('.warn')) {
+    console.log(`Handling command: ${messageText} from ${sender}`);
+
+    if (messageText.startsWith('.addwinner')) {
+        const args = messageText.split(' ').slice(1).join(' ').split(',');
+        if (args.length < 3) {
+            await sendMessage(sock, chatId, '⚠️ Usage: .addwinner <league>, <team>, <username>');
+            return;
+        }
+        const [league, team, username] = args.map(arg => arg.trim());
+        console.log(`Executing addWinner with args: league=${league}, team=${team}, username=${username}`);
+        await addWinner(sock, chatId, sender, league, team, username);
+    } else if (messageText.startsWith('.showhalloffame')) {
+        await showHallOfFame(sock, chatId);
+    } else if (messageText.startsWith('.warn')) {
         if (!await isAdminOrOwner(sock, chatId, sender)) {
             await sendMessage(sock, chatId, '❌ You must be an admin to issue warnings.');
             return;
@@ -541,115 +555,4 @@ async function getCommunityName(sock, chatId) {
     }
 }
 
-async function addWinner(sock, chatId, sender, league, team, username) {
-    try {
-        const communityName = await getCommunityName(sock, chatId);
-
-        // Check if the user already exists in the specified league and community
-        let { data: existingWinner, error } = await supabase
-            .from('hall_of_fame')
-            .select('*')
-            .eq('username', username)
-            .eq('league', league)
-            .eq('community_name', communityName)
-            .single();
-
-        if (error && error.code !== 'PGRST116') {
-            throw error;
-        }
-
-        if (existingWinner) {
-            // Update the existing winner's trophies count
-            const { data, error } = await supabase
-                .from('hall_of_fame')
-                .update({ trophies: existingWinner.trophies + 1 })
-                .eq('username', username)
-                .eq('league', league)
-                .eq('community_name', communityName);
-
-            if (error) throw error;
-        } else {
-            // Insert a new winner
-            const { data, error } = await supabase
-                .from('hall_of_fame')
-                .insert([{ username, team, league, community_name: communityName, trophies: 1 }]);
-
-            if (error) throw error;
-        }
-
-        await sock.sendMessage(chatId, { text: `🏆 Winner added: ${username} (${team}, ${league}) in ${communityName}` });
-    } catch (error) {
-        console.error('Error adding winner:', error);
-        await sock.sendMessage(chatId, { text: '❌ Error adding winner. Please try again.' });
-    }
-}
-
-async function showHallOfFame(sock, chatId) {
-    try {
-        const communityName = await getCommunityName(sock, chatId);
-
-        const { data: winners, error } = await supabase
-            .from('hall_of_fame')
-            .select('*')
-            .eq('community_name', communityName)
-            .order('trophies', { ascending: false });
-
-        if (error) throw error;
-
-        if (!winners || winners.length === 0) {
-            await sock.sendMessage(chatId, { text: `📜 No winners found in the Hall of Fame for ${communityName}.` });
-            return;
-        }
-
-        let message = `🏆 **HALL OF FAME - ${communityName}** 🏆\n`;
-        message += '━━━━━━━━━━━━━━━━━━━━━\n';
-        winners.forEach((winner) => {
-            message += `🥇 **${winner.league}** → ${winner.username} (${winner.team}) ${'🏆'.repeat(winner.trophies)}\n`;
-        });
-        message += '━━━━━━━━━━━━━━━━━━━━━\n';
-        message += '🔥 **Legendary Players** keep making history!\n';
-        message += '📌 *Powered by Techitoon Bot*\n';
-
-        await sock.sendMessage(chatId, { text: message });
-    } catch (error) {
-        console.error('Error fetching Hall of Fame:', error);
-        await sock.sendMessage(chatId, { text: '❌ Error fetching Hall of Fame. Please try again.' });
-    }
-}
-
-const handlePollCommand = async (sock, msg) => {
-    const chatId = msg.key.remoteJid;
-    
-    // Log the entire message structure for debugging
-    console.log("📩 Received message:", JSON.stringify(msg, null, 2));
-
-    // Extract sender correctly
-    const senderJid = msg.key.participant || msg.key.remoteJid;
-    const sender = senderJid.includes(":") ? senderJid.split(":")[0] : senderJid.split("@")[0];
-
-    console.log("📩 Extracted Poll Creator:", sender);
-
-    if (!sender || sender.trim() === "") {
-        console.error("❌ Poll creator extraction failed.");
-        await sock.sendMessage(chatId, { text: '⚠️ Error: Poll creator information is missing.' });
-        return;
-    }
-
-    // Extract command and message body
-    let messageText = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
-    let lines = messageText.split("\n"); // Split by new lines
-
-    if (lines.length < 3) {
-        await sock.sendMessage(chatId, { text: "⚠️ Usage: `.poll <question>` (on first line)\n<option1>\n<option2>\n[More options if needed]" });
-        return;
-    }
-
-    // Extract poll question and options
-    const question = lines[0].replace('.poll ', '').trim(); // First line (removing `.poll`)
-    const options = lines.slice(1).map(opt => opt.trim()); // Remaining lines as options
-
-    // Call createPoll function
-    await pollCommands.createPoll(sock, chatId, question, options, sender);
-};
-
-module.exports = { handleIncomingMessages, handleNewParticipants, checkIfAdmin, handleGroupParticipantsUpdate, setupDebugging, addWinner, showHallOfFame, handlePollCommand, handleCommand };
+module.exports = { handleIncomingMessages, handleNewParticipants, checkIfAdmin, handleGroupParticipantsUpdate, setupDebugging, handleCommand };
