@@ -15,6 +15,8 @@ const { exec } = require("child_process");
 const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
 const { startBot } = require('../bot/bot');
+const { handleStickerCommands } = require('./stickerHandler');
+
 
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
 
@@ -340,12 +342,13 @@ const handleCommand = async (sock, msg) => {
 };
 
 const handleIncomingMessages = async (sock, m) => {
+    let chatId;
     try {
         const message = m.messages[0];
         if (!message.message) return;
 
         const msgText = message.message.conversation || message.message.extendedTextMessage?.text || message.message.imageMessage?.caption || message.message.videoMessage?.caption || '';
-        const chatId = message.key.remoteJid;
+        chatId = message.key.remoteJid;
         const sender = message.key.participant || message.key.remoteJid;
         const isGroup = chatId.endsWith('@g.us');
         const isChannel = chatId.endsWith('@broadcast');
@@ -353,6 +356,9 @@ const handleIncomingMessages = async (sock, m) => {
         const isBackupNumber = sender === config.backupNumber;
 
         console.log(`Received message: ${msgText} from ${sender} in ${chatId}`);
+
+        // Handle sticker commands
+        await handleStickerCommands(sock, message);
 
         // Save message to database
         await saveMessageToDatabase(chatId, message.key.id, sender, msgText);

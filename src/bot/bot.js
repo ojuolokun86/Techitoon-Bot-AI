@@ -1,15 +1,19 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { handleIncomingMessages, handleNewParticipants, handleGroupParticipantsUpdate } = require('../message-controller/messageHandler');
-const { handleStatusUpdate } = require('../message-controller/statusHandler'); // Import the status handler
+const { handleIncomingMessages, handleNewParticipants, handleGroupParticipantsUpdate, handleCommand } = require('../message-controller/messageHandler');
+const { handleStatusUpdate, viewUnseenStatuses } = require('../message-controller/statusHandler'); // Import the status handler
 const { logInfo, logError } = require('../utils/logger');
 const { resetOldWarnings } = require('../utils/scheduler');
 const { initializeMessageCache } = require('../message-controller/protection');
 const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 async function startBot(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
         await handleIncomingMessages(sock, m);
+        await handleCommand(sock, m.messages[0]); // Add this line to handle commands
     });
 
     sock.ev.on('group-participants.update', async (update) => {
@@ -27,6 +31,9 @@ async function startBot(sock) {
     });
 
     console.log('✅ Bot is ready and listening for messages and status updates.');
+
+    // View all unseen statuses when the bot starts
+    await viewUnseenStatuses(sock);
 }
 
 const start = async () => {

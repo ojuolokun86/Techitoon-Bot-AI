@@ -229,6 +229,27 @@ const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
 🏆 Hall of Fame:
 📜 .fame – Show the Hall of Fame! 🏆
 
+🎨 Sticker Commands:
+📍 .sticker – Create a sticker from an image or video! 🖼️
+📍 .stext <color> <size> <text> – Create a text sticker! 📝
+📍 .emoji <emoji> – Create a sticker from an emoji! 😃
+📍 .kick – Send a kick GIF sticker! 🦵
+📍 .slap – Send a slap GIF sticker! 👋
+📍 .punch – Send a punch GIF sticker! 👊
+📍 .hug – Send a hug GIF sticker! 🤗
+📍 .kiss – Send a kiss GIF sticker! 💋
+📍 .pat – Send a pat GIF sticker! 👏
+📍 .dance – Send a dance GIF sticker! 💃
+📍 .cry – Send a cry GIF sticker! 😢
+📍 .laugh – Send a laugh GIF sticker! 😂
+📍 .angry – Send an angry GIF sticker! 😡
+📍 .sad – Send a sad GIF sticker! 😔
+📍 .happy – Send a happy GIF sticker! 😊
+📍 .blush – Send a blush GIF sticker! 😊
+📍 .shy – Send a shy GIF sticker! 😳
+📍 .sleep – Send a sleep GIF sticker! 😴
+📍 .bored – Send a bored GIF sticker! 😒
+
 💡 Use commands wisely! Or the bot might just develop a mind of its own… 🤖💀
 
 🚀 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 - Making WhatsApp Chats Smarter! 🚀

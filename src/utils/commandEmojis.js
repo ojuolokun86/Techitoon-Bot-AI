@@ -46,7 +46,24 @@ const commandEmojis = {
     antideleteon: '🔒',
     antideleteoff: '🔓',
     addwinner: '🏆',
-    fame: '🌟'
+    fame: '🌟',
+    // New sticker commands
+    kick: '👢',
+    slap: '🖐️',
+    punch: '👊',
+    hug: '🤗',
+    kiss: '💋',
+    pat: '👏',
+    dance: '💃',
+    cry: '😢',
+    laugh: '😂',
+    angry: '😡',
+    sad: '😔',
+    happy: '😊',
+    blush: '😊',
+    shy: '😳',
+    sleep: '😴',
+    bored: '😒'
 };
 
 module.exports = commandEmojis;
