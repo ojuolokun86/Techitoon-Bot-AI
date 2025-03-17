@@ -17,6 +17,50 @@ const { startBot } = require('../bot/bot');
 const { handleNewImage, startTournament, showTopScorers, showLeaderboard, addGoal, setGoal, endTournament, addPlayer, removePlayer, listPlayers, uploadResult, enableAutoCheckResult, disableAutoCheckResult } = require('./tournamentHandler');
 const { showHallOfFame, addWinner } = require('./hallOfFame');
 
+
+let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
+
+const isAdminOrOwner = async (sock, chatId, sender) => {
+    try {
+        const groupMetadata = await sock.groupMetadata(chatId);
+        const participants = groupMetadata.participants;
+
+        console.log("Participants:", participants); // Debugging log
+
+        const isAdmin = participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+        const isOwner = sender === config.botOwnerId;
+
+        console.log(`Checking Admin Status - Sender: ${sender}, Is Admin: ${isAdmin}, Is Owner: ${isOwner}`);
+
+        return isAdmin || isOwner;
+    } catch (error) {
+        console.error('Error fetching admin status:', error);
+        return false;
+    }
+};
+
+const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) => {
+    console.log(`Saving message to database: chatId=${chatId}, messageId=${messageId}, sender=${sender}, messageContent=${messageContent}`);
+    const { error } = await supabase
+        .from('anti_delete_messages')
+        .insert([
+            { 
+                chat_id: chatId, 
+                message_id: messageId, 
+                sender: sender, 
+                message_content: messageContent, 
+                timestamp: new Date().toISOString() // Add timestamp
+            }
+        ]);
+
+    if (error) {
+        console.error('Error saving message to database:', error);
+    } else {
+        console.log('Message saved successfully');
+    }
+};
+
+
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
@@ -28,23 +72,53 @@ const handleCommand = async (sock, msg) => {
         await adminCommands.tagAll(sock, chatId, message, sender, repliedMessage);
     } else if (messageText.startsWith('.help')) {
         await handleHelpCommand(sock, chatId, sender);
-    } else if (messageText.startsWith('.resetwarn')) {
-        const args = messageText.split(' ').slice(1);
-        if (args.length > 0) {
-            const userId = args[0];
-            await resetWarnings(sock, chatId, userId);
-        } else {
-            await sendMessage(sock, chatId, '⚠️ Please provide a user ID to reset warnings.');
-        }
     } else if (messageText.startsWith('.warn')) {
-        const args = messageText.split(' ').slice(1);
-        if (args.length > 1) {
-            const userId = args[0];
-            const reason = args.slice(1).join(' ');
-            await issueWarning(sock, chatId, userId, reason, config.warningThreshold);
-        } else {
-            await sendMessage(sock, chatId, '⚠️ Please provide a user ID and reason for the warning.');
-        }
+            if (!await isAdminOrOwner(sock, chatId, sender)) {
+                await sendMessage(sock, chatId, '❌ You must be an admin to issue warnings.');
+                return;
+            }
+    
+            const args = messageText.split(' ').slice(1);
+            const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+            
+            if (mentions.length === 0) {
+                await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+                return;
+            }
+    
+            const userId = mentions[0];
+            const reason = args.slice(1).join(' ') || 'No reason provided';
+            const warningThreshold = config.warningThreshold.default;
+    
+            await issueWarning(sock, chatId, userId, reason, warningThreshold);
+        } else if (messageText.startsWith('.resetwarn')) {
+            if (!await isAdminOrOwner(sock, chatId, sender)) {
+                await sendMessage(sock, chatId, '❌ You must be an admin to reset warnings.');
+                return;
+            }
+    
+            const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+            
+            if (mentions.length === 0) {
+                await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+                return;
+            }
+    
+            const userId = mentions[0];
+    
+            await resetWarnings(sock, chatId, userId);
+        } else if (messageText.startsWith('.promote')) {
+            if (!await isAdminOrOwner(sock, chatId, sender)) {
+                await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
+                return;
+            }
+            const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+            if (mentions.length === 0) {
+                await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
+                return;
+            }
+            const userId = mentions[0];
+            await adminCommands.promoteUser(sock, chatId, userId, sender);
     } else if (messageText.startsWith('.antidelete on')) {
         await enableAntiDelete(chatId);
         await sendMessage(sock, chatId, '✅ Anti-delete has been enabled for this group.');
@@ -323,6 +397,8 @@ const handleNewParticipants = async (sock, chatId, participants) => {
         console.error('Error sending welcome message:', error);
     }
 };
+
+// Removed duplicate checkIfAdmin function
 
 const checkIfAdmin = async (sock, chatId, userId, retries = 3, delay = 2000) => {
     for (let i = 0; i < retries; i++) {

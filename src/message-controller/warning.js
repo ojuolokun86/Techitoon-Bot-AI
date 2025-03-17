@@ -4,11 +4,6 @@ const config = require('../config/config');
 
 const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
     try {
-        // Ensure userId is a string
-        if (typeof userId !== 'string') {
-            throw new Error('Invalid userId');
-        }
-
         // Fetch current warning count
         const { data: existingWarnings, error: fetchError } = await supabase
             .from('warnings')
@@ -60,11 +55,6 @@ const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
 
 const resetWarnings = async (sock, chatId, userId) => {
     try {
-        // Ensure userId is a string
-        if (typeof userId !== 'string') {
-            throw new Error('Invalid userId');
-        }
-
         const { error } = await supabase
             .from('warnings')
             .delete()
