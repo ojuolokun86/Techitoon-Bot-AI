@@ -1,6 +1,6 @@
 const Tesseract = require('tesseract.js');
 const { createClient } = require('@supabase/supabase-js');
-const { sendMessage } = require('../utils/messageUtils');
+const { sendMessage, sendReaction } = require('../utils/messageUtils');
 const { exec } = require('child_process');
 require('dotenv').config();
 
@@ -64,9 +64,9 @@ function parseTeamsAndUsers(messageText) {
     const teamsAndUsers = [];
 
     for (const line of lines) {
-        const match = line.match(/🇦🇷|🇦🇺|🇧🇪|🇧🇷|🇨🇲|🇨🇦|🇨🇷|🇭🇷|🇩🇰|🇪🇨|🇬🇧|🇫🇷|🇩🇪|🇮🇷|🇯🇵|🇲🇽|🇲🇦|🇳🇱|🇳🇬|🇵🇱|🇵🇹|🇶🇦|🇸🇦|🇸🇳|🇷🇸|🇰🇷|🇪🇸|🇨🇭|🇹🇳|🇺🇸|🇺🇾|🏴\s+(\w+)\s+@(.+)/);
+        const match = line.match(/(\d+)\s*,\s*(\w+)\s*,\s*(\w+)\s*,\s*@(.+)/);
         if (match) {
-            const [, team, user] = match;
+            const [, , team, , user] = match;
             teamsAndUsers.push({ team, user });
         }
     }
@@ -277,6 +277,76 @@ async function disableAutoCheckResult(sock, chatId) {
     await sendMessage(sock, chatId, '🚫 Auto result checking is now *DISABLED*! 📌 Match results must be entered manually.');
 }
 
+const handleCommand = async (sock, msg) => {
+    const chatId = msg.key.remoteJid;
+    const sender = msg.key.participant || msg.key.remoteJid;
+    const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+
+    // Check if the sender is an admin or the bot owner
+    const isAdmin = await checkIfAdmin(sock, chatId, sender);
+    const isBotOwner = sender === config.botOwner;
+
+    if (!isAdmin && !isBotOwner) {
+        await sendMessage(sock, chatId, '⚠️ You do not have permission to use this command.');
+        return;
+    }
+
+    if (messageText.startsWith('.help')) {
+        const helpMessage = `
+            🚀 *Techitoon Bot Commands* 🚀
+
+            📌 *Tournament Commands*:
+            - .starttournament communityName
+            - .best attack communityName
+            - .top scorers
+            - .goal playerName goals
+            - .setgoal playerName goals
+            - .end best attack
+            - .add player playerName team community
+            - .remove player playerName community
+            - .list players community
+            - .upload result
+            - .auto check result
+            - .auto check result off
+        `;
+        await sendMessage(sock, chatId, helpMessage);
+    } else if (messageText.startsWith('.starttournament')) {
+        const args = messageText.split(' ').slice(1);
+        const communityName = args[0];
+        await startTournament(sock, chatId, communityName, messageText);
+    } else if (messageText.startsWith('.best attack')) {
+        const args = messageText.split(' ').slice(2);
+        const communityName = args[0];
+        await showTopScorers(sock, chatId, communityName);
+    } else if (messageText === '.top scorers') {
+        await showLeaderboard(sock, chatId);
+    } else if (messageText.startsWith('.goal')) {
+        const [_, playerName, goals] = messageText.split(' ');
+        await addGoal(sock, chatId, playerName.replace('@', ''), parseInt(goals));
+    } else if (messageText.startsWith('.setgoal')) {
+        const [_, playerName, goals] = messageText.split(' ');
+        await setGoal(sock, chatId, playerName.replace('@', ''), parseInt(goals));
+    } else if (messageText === '.end best attack') {
+        await endTournament(sock, chatId);
+    } else if (messageText.startsWith('.add player')) {
+        const [_, playerName, team, community] = messageText.split(' ');
+        await addPlayer(sock, chatId, playerName, team, community);
+    } else if (messageText.startsWith('.remove player')) {
+        const [_, playerName, community] = messageText.split(' ');
+        await removePlayer(sock, chatId, playerName, community);
+    } else if (messageText.startsWith('.list players')) {
+        const community = messageText.split(' ')[2];
+        await listPlayers(sock, chatId, community);
+    } else if (messageText.startsWith('.upload result')) {
+        const imagePath = await downloadImage(msg);
+        await uploadResult(sock, chatId, imagePath);
+    } else if (messageText === '.auto check result') {
+        await enableAutoCheckResult(sock, chatId);
+    } else if (messageText === '.auto check result off') {
+        await disableAutoCheckResult(sock, chatId);
+    }
+};
+
 module.exports = {
     handleNewImage,
     startTournament,
@@ -290,5 +360,6 @@ module.exports = {
     listPlayers,
     uploadResult,
     enableAutoCheckResult,
-    disableAutoCheckResult
+    disableAutoCheckResult,
+    handleCommand
 };

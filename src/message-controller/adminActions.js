@@ -23,7 +23,7 @@ const clearChat = async (sock, chatId) => {
     }
 };
 
-const tagAll = async (sock, chatId, message, sender) => {
+const tagAll = async (sock, chatId, message, sender, repliedMessage = '') => {
     if (!await isAdminOrOwner(sock, chatId, sender)) {
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter('❌ Only admins or the bot owner can use this command.') });
         return;
@@ -33,15 +33,18 @@ const tagAll = async (sock, chatId, message, sender) => {
         const groupMetadata = await sock.groupMetadata(chatId);
         const participants = groupMetadata.participants.map(p => p.id);
 
+        if (!participants.length) throw new Error("No participants found");
+
         let text = `│👥 Group : ${groupMetadata.subject}\n`;
-        text += `│👤 Hey😀 : @${sender.split('@')[0]}\n`;
-        text += `│📜 Message : *${message}*\n`;
+        text += `│👤 Hey😀 : @${(sender || '').split('@')[0]}\n`;
+
+        // If it's a reply, use the replied message; otherwise, use the provided message
+        const messageContent = repliedMessage || message || 'No message';
+        text += `│📜 Message : *${messageContent}*\n`;
         text += `╰─────────────━┈⊷\n\n`;
 
-        // Add mentions to the text (actual mentions, not just text)
         text += participants.map(id => `😟 @${id.split('@')[0]}`).join('\n');
 
-        // Send message with actual mentions
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(text), mentions: participants });
     } catch (error) {
         console.error('Error tagging all participants:', error);
@@ -191,11 +194,34 @@ const banUser = async (sock, chatId, args, sender) => {
 };
 
 const deleteMessage = async (sock, chatId, msg) => {
-    if (msg.message.extendedTextMessage && msg.message.extendedTextMessage.contextInfo) {
-        const messageId = msg.message.extendedTextMessage.contextInfo.stanzaId;
-        await sock.sendMessage(chatId, { delete: { id: messageId, remoteJid: chatId, fromMe: false } });
+    try {
+        const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+
+        if (!contextInfo || !contextInfo.stanzaId) {
+            console.log("⚠️ No replied message found to delete!");
+            await sock.sendMessage(chatId, { text: "⚠️ Reply to a message with .delete to remove it." });
+            return;
+        }
+
+        const messageId = contextInfo.stanzaId;
+        console.log(`🛠 Attempting to delete message: ${messageId}`);
+
+        await sock.sendMessage(chatId, { 
+            delete: { 
+                id: messageId, 
+                remoteJid: chatId, 
+                fromMe: true // Force deletion 
+            } 
+        });
+
+        console.log("✅ Message deleted successfully!");
+
+    } catch (error) {
+        console.error("❌ Error deleting message:", error);
+        await sock.sendMessage(chatId, { text: `⚠️ Could not delete message: ${error.message}` });
     }
 };
+
 
 const startWelcome = async (sock, chatId) => {
     const { data, error } = await supabase

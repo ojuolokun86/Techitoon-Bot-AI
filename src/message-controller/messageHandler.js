@@ -22,7 +22,13 @@ const handleCommand = async (sock, msg) => {
     const sender = msg.key.participant || msg.key.remoteJid;
     const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
 
-    if (messageText.startsWith('.resetwarn')) {
+    if (messageText.startsWith('.tagall')) {
+        const repliedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
+        const message = messageText.replace('.tagall', '').trim();
+        await adminCommands.tagAll(sock, chatId, message, sender, repliedMessage);
+    } else if (messageText.startsWith('.help')) {
+        await handleHelpCommand(sock, chatId, sender);
+    } else if (messageText.startsWith('.resetwarn')) {
         const args = messageText.split(' ').slice(1);
         if (args.length > 0) {
             const userId = args[0];
@@ -151,7 +157,7 @@ const handleCommand = async (sock, msg) => {
     } else if (messageText.startsWith('.showstats')) {
         await showGroupStats(sock, chatId);
     } else if (messageText.startsWith('.delete')) {
-        await adminCommands.deleteMessage(sock, chatId, message);
+        await adminCommands.deleteMessage(sock, chatId, msg);
     } else if (messageText.startsWith('.enable')) {
         await adminCommands.enableBot(sock, chatId, sender);
     } else if (messageText.startsWith('.disable')) {
