@@ -1,8 +1,9 @@
 require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { logInfo, logError } = require('./utils/logger');
-const { handleIncomingMessages, handleGroupParticipantsUpdate } = require('./message-controller/messageHandler');
+const { handleGroupParticipantsUpdate } = require('./message-controller/messageHandler');
 const { startSecurityBot } = require('./security');
+const { processMessageWithRestrictedMode } = require('./bot/restrictedMode'); // Import restrictedMode.js
 const config = require('./config/config');
 const supabase = require('./supabaseClient');
 
@@ -29,7 +30,11 @@ async function fetchGroupMetadataWithRetry(sock, groupId, retries = 3, delay = 2
 async function startMainBot(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
-        await handleIncomingMessages(sock, m);
+        for (const msg of m.messages) {
+        // Ignore bot's own messages
+                await processMessageWithRestrictedMode(sock, msg); // Use restrictedMode.js
+            
+        }
     });
 
     sock.ev.on('group-participants.update', async (update) => {

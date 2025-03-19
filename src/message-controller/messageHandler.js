@@ -18,6 +18,7 @@ const { handleNewImage, startTournament, showTopScorers, showLeaderboard, addGoa
 const { showHallOfFame, addWinner } = require('./hallOfFame');
 
 
+
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
 
 const isAdminOrOwner = async (sock, chatId, sender) => {
@@ -163,11 +164,23 @@ const handleCommand = async (sock, msg) => {
     } else if (messageText.startsWith('.stopannounce')) {
         await adminCommands.stopAnnouncement(sock, chatId);
     } else if (messageText.startsWith('.schedule')) {
-        const message = messageText.replace('.schedule', '').trim();
-        await scheduleCommands.scheduleMessage(sock, chatId, message);
+        const args = messageText.split(' ').slice(1); // Split the command into arguments
+        if (args.length < 2) {
+            await sendMessage(sock, chatId, '⚠️ Please provide a valid date and message.');
+            return;
+        }
+
+        await scheduleCommands.scheduleMessage(sock, chatId, args);
     } else if (messageText.startsWith('.remind')) {
-        const message = messageText.replace('.remind', '').trim();
-        await scheduleCommands.remind(sock, chatId, message);
+        const args = messageText.split(' ').slice(1); // Split the command into arguments
+        if (args.length < 2) {
+            await sendMessage(sock, chatId, '⚠️ Please provide a valid time and reminder message.');
+            return;
+        }
+
+        await scheduleCommands.remind(sock, chatId, args);
+    }else if (messageText.startsWith('.listschedule')) {
+        await scheduleCommands.listSchedule(sock, chatId);   
     } else if (messageText.startsWith('.cancelschedule')) {
         const args = messageText.split(' ').slice(1);
         await scheduleCommands.cancelSchedule(sock, chatId, args);
@@ -274,6 +287,40 @@ const handleCommand = async (sock, msg) => {
         const args = messageText.split(' ').slice(1);
         const [username, league, team] = args.join(' ').split(',');
         await addWinner(sock, chatId, sender, league.trim(), team.trim(), username.trim());
+    } else if (messageText.startsWith('.startgoodbye')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can enable goodbye messages.');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('group_settings')
+            .update({ goodbye_messages_enabled: true })
+            .eq('group_id', chatId);
+
+        if (error) {
+            console.error('Error enabling goodbye messages:', error);
+            await sendMessage(sock, chatId, '⚠️ Error enabling goodbye messages. Please try again later.');
+        } else {
+            await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled for this group.');
+        }
+    } else if (messageText.startsWith('.stopgoodbye')) {
+        if (!await isAdminOrOwner(sock, chatId, sender)) {
+            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can disable goodbye messages.');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('group_settings')
+            .update({ goodbye_messages_enabled: false })
+            .eq('group_id', chatId);
+
+        if (error) {
+            console.error('Error disabling goodbye messages:', error);
+            await sendMessage(sock, chatId, '⚠️ Error disabling goodbye messages. Please try again later.');
+        } else {
+            await sendMessage(sock, chatId, '❌ Goodbye messages have been disabled for this group.');
+        }
     }
 };
 
@@ -529,4 +576,22 @@ const handlePollCommand = async (sock, msg) => {
     await pollCommands.createPoll(sock, chatId, question, options, sender);
 };
 
-module.exports = { handleIncomingMessages, handleNewParticipants, checkIfAdmin, handleGroupParticipantsUpdate, setupDebugging, addWinner, showHallOfFame, handlePollCommand, handleCommand };
+console.log("✅ handleCommand is defined as:", typeof handleCommand);
+
+
+console.log("✅ Exporting handleCommand...");
+
+module.exports = {
+    handleCommand: handleCommand,
+    handleIncomingMessages: handleIncomingMessages,
+    handleNewParticipants: handleNewParticipants,
+    checkIfAdmin: checkIfAdmin,
+    handleGroupParticipantsUpdate: handleGroupParticipantsUpdate,
+    setupDebugging: setupDebugging,
+    addWinner: addWinner,
+    showHallOfFame: showHallOfFame,
+    handlePollCommand: handlePollCommand
+};
+
+console.log("✅ messageHandler.js is fully exported:", module.exports);
+

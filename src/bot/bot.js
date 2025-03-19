@@ -1,14 +1,18 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { handleIncomingMessages, handleNewParticipants, handleGroupParticipantsUpdate } = require('../message-controller/messageHandler');
+const { handleNewParticipants, handleGroupParticipantsUpdate } = require('../message-controller/messageHandler');
 const { logInfo, logError } = require('../utils/logger');
 const { resetOldWarnings } = require('../utils/scheduler');
 const { initializeMesssageCache } = require('../message-controller/protection');
 const path = require('path');
+const { processMessageWithRestrictedMode } = require('../bot/restrictedMode');
 
 async function startBot(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
-        await handleIncomingMessages(sock, m);
+        for (const msg of m.messages) {
+            // Allow the bot to process its own messages
+            await processMessageWithRestrictedMode(sock, msg);
+        }
     });
 
     sock.ev.on('group-participants.update', async (update) => {

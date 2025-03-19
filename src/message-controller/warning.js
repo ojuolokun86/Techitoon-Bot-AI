@@ -2,7 +2,7 @@ const { sendMessage } = require('../utils/messageUtils');
 const supabase = require('../supabaseClient');
 const config = require('../config/config');
 
-const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
+const issueWarning = async (sock, chatId, userId, reason, warningThreshold = config.warningThreshold.default) => {
     try {
         // Fetch current warning count
         const { data: existingWarnings, error: fetchError } = await supabase
@@ -30,8 +30,11 @@ const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
             return;
         }
 
+        // Determine the threshold based on the reason
+        const threshold = config.warningThreshold[reason] || warningThreshold;
+
         // Calculate remaining warnings before kick
-        const remainingWarnings = warningThreshold - warningCount;
+        const remainingWarnings = threshold - warningCount;
 
         // Send warning message
         let warningMessage = `⚠️ @${userId.split('@')[0]}, you have been warned for: ${reason}. This is warning #${warningCount}.`;
@@ -42,11 +45,22 @@ const issueWarning = async (sock, chatId, userId, reason, warningThreshold) => {
 
         console.log(`⚠️ User ${userId} warned in group: ${chatId}`);
 
-        // Check if the warning count exceeds the threshold
-        if (warningCount >= warningThreshold) {
+        // Check if the warning count meets or exceeds the threshold
+        if (warningCount >= threshold) {
             // Kick the user out of the group
             await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
             console.log(`🚫 User ${userId} kicked from group: ${chatId} after reaching warning threshold.`);
+            
+            // Optionally, reset the user's warnings after kicking
+            const { error: resetError } = await supabase
+                .from('warnings')
+                .delete()
+                .eq('user_id', userId)
+                .eq('group_id', chatId);
+
+            if (resetError) {
+                console.error('Error resetting warnings after kicking user:', resetError);
+            }
         }
     } catch (error) {
         console.error('Error issuing warning:', error);
