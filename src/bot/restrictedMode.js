@@ -4,16 +4,16 @@ const config = require('../config/config');
 
 let messageHandler;
 let handleCommand;
+let handleIncomingMessages;
 
 const loadMessageHandler = () => {
     if (!messageHandler) {
         messageHandler = require('../message-controller/messageHandler');
         handleCommand = messageHandler.handleCommand;
-        console.log("✅ handleCommand loaded:", typeof handleCommand);
+        handleIncomingMessages = messageHandler.handleIncomingMessages;
+        console.log("✅ handleCommand and handleIncomingMessages loaded");
     }
 };
-
-
 
 // Check if restricted mode is enabled for a group
 const isRestrictedModeEnabled = async (chatId) => {
@@ -86,14 +86,22 @@ const processMessageWithRestrictedMode = async (sock, msg) => {
     // Allow the bot to process its own messages for restricted mode commands
     const isBotMessage = msg.key.fromMe;
 
-    // Check if restricted mode is enabled
-    const restrictedMode = await isRestrictedModeEnabled(chatId);
-    console.log(`🔒 Restricted mode for chatId=${chatId}: ${restrictedMode}`);
-
     // Handle restricted mode commands (even if the message is from the bot itself)
     if (messageText.startsWith('.restrictbot') || messageText.startsWith('.unrestrictbot')) {
         console.log(`⚙️ Handling restricted mode command: ${messageText}`);
         await handleRestrictedModeCommands(sock, chatId, sender, messageText);
+        return; // Stop further processing
+    }
+
+    // Check if restricted mode is enabled
+    const restrictedMode = await isRestrictedModeEnabled(chatId);
+    console.log(`🔒 Restricted mode for chatId=${chatId}: ${restrictedMode}`);
+
+    // If the message does not start with a command prefix, process it normally
+    if (!messageText.startsWith('.')) {
+        console.log("➡️ Message does not start with a command prefix, processing normally.");
+        loadMessageHandler(); // Ensure messageHandler is loaded
+        await handleIncomingMessages(sock, { messages: [msg] }); // Pass other messages to handleIncomingMessages
         return; // Stop further processing
     }
 

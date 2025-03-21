@@ -31,9 +31,8 @@ async function startMainBot(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
         for (const msg of m.messages) {
-        // Ignore bot's own messages
-                await processMessageWithRestrictedMode(sock, msg); // Use restrictedMode.js
-            
+            // Ignore bot's own messages
+            await processMessageWithRestrictedMode(sock, msg); // Use restrictedMode.js
         }
     });
 
