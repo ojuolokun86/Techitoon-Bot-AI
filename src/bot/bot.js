@@ -6,10 +6,18 @@ const { initializeMesssageCache } = require('../message-controller/protection');
 const path = require('path');
 const { processMessageWithRestrictedMode } = require('../bot/restrictedMode');
 const { handlePowerCommand, isBotOn } = require('./botPower');
+//const { addUser, getUsers, removeUser } = require('../userManager');
 
-async function startBot(sock) {
+async function startUserBot(userNumber) {
+    const userSessionPath = path.resolve(`./sessions/${userNumber}`);
+    const { state, saveCreds } = await useMultiFileAuthState(userSessionPath);
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false,
+    });
+
     sock.ev.on('messages.upsert', async (m) => {
-        console.log('📩 New message upsert:', m);
+        console.log(`📩 New message upsert for user ${userNumber}:`, m);
         for (const msg of m.messages) {
             // Always handle power commands
             await handlePowerCommand(sock, msg);
@@ -39,38 +47,42 @@ async function startBot(sock) {
         await handleGroupParticipantsUpdate(sock, update);
     });
 
-    console.log('✅ Bot is ready and listening for messages.');
-}
-
-const start = async () => {
-    const { state, saveCreds } = await useMultiFileAuthState(path.resolve('./auth_info'));
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true,
-    });
-
-    initializeMesssageCache(sock);
-
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            logError(`Connection closed due to ${lastDisconnect.error}, reconnecting ${shouldReconnect}`);
+            logError(`Connection closed for user ${userNumber} due to ${lastDisconnect.error}, reconnecting ${shouldReconnect}`);
             if (shouldReconnect) {
-                start();
+                startUserBot(userNumber);
             }
         } else if (connection === 'open') {
-            logInfo('Techitoon Bot is ready!');
-            startBot(sock);
+            logInfo(`Bot for user ${userNumber} is ready!`);
             resetOldWarnings(sock); // Start the scheduled job
+        } else if (connection === 'qr') {
+            console.log(`QR code received for user ${userNumber}, sending it to their WhatsApp number.`);
+            // Send the QR code to the user's WhatsApp number
+            const qrCodeImage = Buffer.from(update.qr, 'base64');
+            sock.sendMessage(userNumber, { image: qrCodeImage, caption: 'Scan this QR code to authenticate your bot.' });
         }
     });
 
     sock.ev.on('creds.update', saveCreds);
+}
+
+//async function startMainBot() {
+  //  const users = await getUsers();
+   // for (const userNumber of users) {
+   //     startUserBot(userNumber);
+    //}
+//}
+
+const start = async () => {
+    console.log('Starting main bot...');
+    startMainBot();
 };
 
 start().catch(error => {
-    logError(`❌ Error starting bot: ${error}`);
+    logError(`❌ Error starting main bot: ${error}`);
 });
 
-module.exports = { start, startBot };
+module.exports = { start, startUserBot };

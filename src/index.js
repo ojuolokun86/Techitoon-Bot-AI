@@ -7,6 +7,8 @@ const { processMessageWithRestrictedMode } = require('./bot/restrictedMode'); //
 const config = require('./config/config');
 const supabase = require('./supabaseClient');
 const { handlePowerCommand, isBotOn } = require('./bot/botPower');
+const { addUser, getUsers, removeUser } = require('./userManager');
+const { startUserBot } = require('./bot/bot');
 
 async function saveSuperadmin(groupId, userId) {
     await supabase
@@ -92,3 +94,23 @@ const start = async () => {
 start().catch(error => {
     logError(`❌ Error starting bot: ${error}`);
 });
+
+//bot.on('message', async (msg) => {
+   // const sender = msg.sender;
+   // const message = msg.body.trim();
+    //const args = message.split(' ');
+
+    //if (message.startsWith('.adduser')) {
+      //  if (!args[1]) return bot.sendMessage(sender, "Usage: .adduser <user_number>");
+        //const response = await addUser(args[1]);
+       // bot.sendMessage(sender, response);
+       // startUserBot(args[1]); // Start the bot for the new user
+    //} else if (message === '.users') {
+      //  const users = await getUsers();
+       // bot.sendMessage(sender, `Registered Users:\n${users.join('\n')}`);
+    //} else if (message.startsWith('.removeuser')) {
+        //if (!args[1]) return bot.sendMessage(sender, "Usage: .removeuser <user_number>");
+      //  const response = await removeUser(args[1]);
+    //    bot.sendMessage(sender, response);
+  //  }
+//});
