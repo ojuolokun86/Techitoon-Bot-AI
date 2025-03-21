@@ -6,6 +6,7 @@ const { startSecurityBot } = require('./security');
 const { processMessageWithRestrictedMode } = require('./bot/restrictedMode'); // Import restrictedMode.js
 const config = require('./config/config');
 const supabase = require('./supabaseClient');
+const { handlePowerCommand, isBotOn } = require('./bot/botPower');
 
 async function saveSuperadmin(groupId, userId) {
     await supabase
@@ -31,12 +32,26 @@ async function startMainBot(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
         for (const msg of m.messages) {
+            // Always handle power commands
+            await handlePowerCommand(sock, msg);
+
+            // If the bot is powered off, ignore all other commands
+            if (!isBotOn()) {
+                console.log('🛑 Bot is powered off, ignoring all commands.');
+                continue;
+            }
+
             // Ignore bot's own messages
             await processMessageWithRestrictedMode(sock, msg); // Use restrictedMode.js
         }
     });
 
     sock.ev.on('group-participants.update', async (update) => {
+        // If the bot is powered off, ignore all events
+        if (!isBotOn()) {
+            console.log('🛑 Bot is powered off, ignoring all events.');
+            return;
+        }
         await handleGroupParticipantsUpdate(sock, update);
     });
 

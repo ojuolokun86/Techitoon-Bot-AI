@@ -5,17 +5,33 @@ const { resetOldWarnings } = require('../utils/scheduler');
 const { initializeMesssageCache } = require('../message-controller/protection');
 const path = require('path');
 const { processMessageWithRestrictedMode } = require('../bot/restrictedMode');
+const { handlePowerCommand, isBotOn } = require('./botPower');
 
 async function startBot(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
         for (const msg of m.messages) {
+            // Always handle power commands
+            await handlePowerCommand(sock, msg);
+
+            // If the bot is powered off, ignore all other commands
+            if (!isBotOn()) {
+                console.log('🛑 Bot is powered off, ignoring all commands.');
+                return;
+            }
+
             // Allow the bot to process its own messages
             await processMessageWithRestrictedMode(sock, msg);
         }
     });
 
     sock.ev.on('group-participants.update', async (update) => {
+        // If the bot is powered off, ignore all events
+        if (!isBotOn()) {
+            console.log('🛑 Bot is powered off, ignoring all events.');
+            return;
+        }
+
         const { id, participants, action } = update;
         if (action === 'add') {
             await handleNewParticipants(sock, id, participants);
