@@ -1,6 +1,7 @@
 const supabase = require('../supabaseClient');
 const { sendMessage, sendReaction } = require('../utils/messageUtils');
 const config = require('../config/config');
+const { getPrefix } = require('../utils/configUtils');
 
 let messageHandler;
 let handleCommand;
@@ -68,9 +69,10 @@ const toggleRestrictedMode = async (sock, chatId, sender, enable) => {
 // Handle restricted mode commands
 const handleRestrictedModeCommands = async (sock, chatId, sender, messageText) => {
     console.log(`📩 Handling restricted mode command: ${messageText} from sender=${sender}`);
-    if (messageText.startsWith('.restrictbot')) {
+    const currentPrefix = await getPrefix();
+    if (messageText.startsWith(`${currentPrefix}restrictbot`)) {
         await toggleRestrictedMode(sock, chatId, sender, true);
-    } else if (messageText.startsWith('.unrestrictbot')) {
+    } else if (messageText.startsWith(`${currentPrefix}unrestrictbot`)) {
         await toggleRestrictedMode(sock, chatId, sender, false);
     }
 };
@@ -86,8 +88,11 @@ const processMessageWithRestrictedMode = async (sock, msg) => {
     // Allow the bot to process its own messages for restricted mode commands
     const isBotMessage = msg.key.fromMe;
 
+    // Get the current prefix
+    const currentPrefix = await getPrefix();
+
     // Handle restricted mode commands (even if the message is from the bot itself)
-    if (messageText.startsWith('.restrictbot') || messageText.startsWith('.unrestrictbot')) {
+    if (messageText.startsWith(`${currentPrefix}restrictbot`) || messageText.startsWith(`${currentPrefix}unrestrictbot`)) {
         console.log(`⚙️ Handling restricted mode command: ${messageText}`);
         await handleRestrictedModeCommands(sock, chatId, sender, messageText);
         return; // Stop further processing
@@ -98,7 +103,7 @@ const processMessageWithRestrictedMode = async (sock, msg) => {
     console.log(`🔒 Restricted mode for chatId=${chatId}: ${restrictedMode}`);
 
     // If the message does not start with a command prefix, process it normally
-    if (!messageText.startsWith('.')) {
+    if (!messageText.startsWith(currentPrefix)) {
         console.log("➡️ Message does not start with a command prefix, processing normally.");
         loadMessageHandler(); // Ensure messageHandler is loaded
         await handleIncomingMessages(sock, { messages: [msg] }); // Pass other messages to handleIncomingMessages

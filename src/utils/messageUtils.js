@@ -1,5 +1,6 @@
 const formatResponseWithHeaderFooter = require('./utils').formatResponseWithHeaderFooter;
 const commandEmojis = require('./commandEmojis');
+const { getPrefix } = require('./configUtils');
 
 const sendMessage = async (sock, chatId, message, mentions = []) => {
     try {
@@ -15,9 +16,13 @@ const sendMessage = async (sock, chatId, message, mentions = []) => {
     }
 };
 
-const sendReaction = async (sock, chatId, messageId, command) => {
+const sendReaction = async (sock, chatId, messageId, messageText) => {
     try {
+        // Extract the command name from the message text
+        const currentPrefix = await getPrefix();
+        const command = messageText.slice(currentPrefix.length).split(' ')[0].toLowerCase();
         const emoji = commandEmojis[command] || '👍'; // Default to thumbs up if command not found
+
         await sock.sendMessage(chatId, {
             react: {
                 text: emoji,

@@ -4,6 +4,7 @@ const axios = require('axios');
 const { enableAntiDelete, disableAntiDelete } = require('./protection'); // Import the enable and disable functions
 const config = require('../config/config'); // Import the config to get the bot owner ID
 const { startBot } = require('../bot/bot');
+const { getPrefix } = require('../utils/configUtils'); // Import getPrefix function
 
 // Function to show all group statistics
 const showAllGroupStats = async (sock, chatId) => {
@@ -58,16 +59,23 @@ ${mostCommandUsers}
 // Function to update user statistics
 const updateUserStats = async (userId, groupId, statName) => {
     try {
-        const { data, error } = await supabase
+        // First, try to increment the existing value
+        const { error: incrementError } = await supabase
             .from('group_stats')
-            .upsert({ user_id: userId, group_id: groupId, name: statName, value: 1 }, { onConflict: ['user_id', 'group_id', 'name'] })
+            .update({ value: supabase.raw('value + 1') })
             .eq('user_id', userId)
             .eq('group_id', groupId)
-            .eq('name', statName)
-            .increment('value', 1);
+            .eq('name', statName);
 
-        if (error) {
-            console.error('Error updating user stats:', error);
+        if (incrementError) {
+            // If increment fails, try to insert a new row
+            const { error: upsertError } = await supabase
+                .from('group_stats')
+                .upsert({ user_id: userId, group_id: groupId, name: statName, value: 1 }, { onConflict: ['user_id', 'group_id', 'name'] });
+
+            if (upsertError) {
+                console.error('Error upserting user stats:', upsertError);
+            }
         }
     } catch (error) {
         console.error('Error updating user stats:', error);
@@ -168,66 +176,75 @@ const sendGroupInfo = async (sock, chatId, botNumber) => {
 };
 
 const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
+    const currentPrefix = await getPrefix(); // Get the current prefix dynamically
     const helpText = `
 📜✨ 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 𝘽𝙤𝙩 𝙈𝙚𝙣𝙪 ✨📜
 🔹 Your friendly AI assistant, here to serve! 🤖
 
 💡 General Commands:
-📍 .ping – Am I alive? Let’s find out! ⚡
-📍 .menu – Shows this awesome menu! 📜
-📍 .joke – Need a laugh? I got you! 😂
-📍 .quote – Get inspired with a random quote! ✨
-📍 .weather <city> – Check the skies before you step out! ☁️🌦️
-📍 .translate <text> – Lost in translation? I’ll help! 🈶➡️🇬🇧
+📍 ${currentPrefix}ping – Am I alive? Let’s find out! ⚡
+📍 ${currentPrefix}menu – Shows this awesome menu! 📜
+📍 ${currentPrefix}joke – Need a laugh? I got you! 😂
+📍 ${currentPrefix}quote – Get inspired with a random quote! ✨
+📍 ${currentPrefix}weather <city> – Check the skies before you step out! ☁️🌦️
+📍 ${currentPrefix}translate <text> – Lost in translation? I’ll help! 🈶➡️🇬🇧
 
 👑 Admin Commands (Boss Mode Activated!)
-🛠️ .admin – See who’s running the show! 🏆
-📊 .info – Get group details in one click! 🕵️‍♂️
-📜 .rules – Read the sacred laws of the group! 📖
-🧹 .clear – Wipe the chat clean! 🚮 (Admin Only)
-🚫 .ban @user – Send someone to exile! 👋 (Admin Only)
-🎤 .tagall – Summon all group members! 🏟️ (Admin Only)
-🔇 .mute – Silence! Only admins can speak! 🤫 (Admin Only)
-🔊 .unmute – Let the people speak again! 🎙️ (Admin Only)
-📢 .announce <message> – Make a grand announcement! 📡 (Admin Only)
-🚫 .stopannounce – End announcement mode! ❌ (Admin Only)
+🛠️ ${currentPrefix}admin – See who’s running the show! 🏆
+📊 ${currentPrefix}info – Get group details in one click! 🕵️‍♂️
+📜 ${currentPrefix}rules – Read the sacred laws of the group! 📖
+🧹 ${currentPrefix}clear – Wipe the chat clean! 🚮 (Admin Only)
+🚫 ${currentPrefix}ban @user – Send someone to exile! 👋 (Admin Only)
+🎤 ${currentPrefix}tagall – Summon all group members! 🏟️ (Admin Only)
+🔇 ${currentPrefix}mute – Silence! Only admins can speak! 🤫 (Admin Only)
+🔊 ${currentPrefix}unmute – Let the people speak again! 🎙️ (Admin Only)
+📢 ${currentPrefix}announce <message> – Make a grand announcement! 📡 (Admin Only)
+🚫 ${currentPrefix}stopannounce – End announcement mode! ❌ (Admin Only)
 
 📅 Scheduling & Reminders:
-⏳ .schedule <message> – Set a future message! ⏰ (Admin Only)
-🔔 .remind <message> – Never forget important stuff! 📝 (Admin Only)
-❌ .cancelschedule – Abort mission! Stop scheduled messages! 🚀 (Admin Only)
-❌ .cancelreminder – Forget the reminder! 🚫 (Admin Only)
+⏳ ${currentPrefix}schedule <message> – Set a future message! ⏰ (Admin Only)
+🔔 ${currentPrefix}remind <message> – Never forget important stuff! 📝 (Admin Only)
+❌ ${currentPrefix}cancelschedule – Abort mission! Stop scheduled messages! 🚀 (Admin Only)
+❌ ${currentPrefix}cancelreminder – Forget the reminder! 🚫 (Admin Only)
 
 📊 Polls & Tournaments:
-📊 .poll <question> – Let democracy decide! 🗳️ (Admin Only)
-🗳️ .vote <option> – Cast your vote like a good citizen! ✅
-🏁 .endpoll – Wrap up the poll and declare the winner! 🎉 (Admin Only)
-⚽ .starttournament – Let the games begin! 🏆 (Admin Only)
-🏁 .endtournament – Close the tournament! 🏅 (Admin Only)
-📢 .tournamentstatus – Check who’s winning! 📊
+📊 ${currentPrefix}poll <question> – Let democracy decide! 🗳️ (Admin Only)
+🗳️ ${currentPrefix}vote <option> – Cast your vote like a good citizen! ✅
+🏁 ${currentPrefix}endpoll – Wrap up the poll and declare the winner! 🎉 (Admin Only)
+⚽ ${currentPrefix}starttournament – Let the games begin! 🏆 (Admin Only)
+🏁 ${currentPrefix}endtournament – Close the tournament! 🏅 (Admin Only)
+📢 ${currentPrefix}tournamentstatus – Check who’s winning! 📊
 
 ⚙️ Group & Bot Settings:
-📝 .setgrouprules <rules> – Set the laws of the land! 📜 (Admin Only)
-📜 .settournamentrules <rules> – Define tournament rules! ⚽ (Admin Only)
-🈯 .setlanguage <language> – Change the bot’s language! 🌍 (Admin Only)
-📊 .showstats – Who’s been the most active? 📈 (Admin Only)
-❌ .delete – Erase unwanted messages! 🔥 (Admin Only)
-🚀 .enable – Power up the bot! ⚡
-🛑 .disable – Shut me down… but why? 😢
-🎉 .startwelcome – Activate welcome messages! 🎊 (Admin Only)
-🚫 .stopwelcome – No more welcome hugs! 🙅‍♂️ (Admin Only)
+📝 ${currentPrefix}setgrouprules <rules> – Set the laws of the land! 📜 (Admin Only)
+📜 ${currentPrefix}settournamentrules <rules> – Define tournament rules! ⚽ (Admin Only)
+🈯 ${currentPrefix}setlanguage <language> – Change the bot’s language! 🌍 (Admin Only)
+📊 ${currentPrefix}showstats – Who’s been the most active? 📈 (Admin Only)
+❌ ${currentPrefix}delete – Erase unwanted messages! 🔥 (Admin Only)
+🚀 ${currentPrefix}enable – Power up the bot! ⚡
+🛑 ${currentPrefix}disable – Shut me down… but why? 😢
+🎉 ${currentPrefix}startwelcome – Activate welcome messages! 🎊 (Admin Only)
+🚫 ${currentPrefix}stopwelcome – No more welcome hugs! 🙅‍♂️ (Admin Only)
 
 ⚠️ Warnings & Moderation:
-🚨 .warn @user <reason> – Issue a formal warning! ⚠️ (Admin Only)
-📜 .listwarn – Check the troublemakers! 👀 (Admin Only)
-❌ .resetwarn @user – Forgive and forget! ✝️ (Admin Only)
+🚨 ${currentPrefix}warn @user <reason> – Issue a formal warning! ⚠️ (Admin Only)
+📜 ${currentPrefix}listwarn – Check the troublemakers! 👀 (Admin Only)
+❌ ${currentPrefix}resetwarn @user – Forgive and forget! ✝️ (Admin Only)
 
 🔒 Anti-Delete:
-🔓 .antidelete on – Enable anti-delete feature! 🔒 (Admin Only)
-🔓 .antidelete off – Disable anti-delete feature! 🔓 (Admin Only)
+🔓 ${currentPrefix}antidelete on – Enable anti-delete feature! 🔒 (Admin Only)
+🔓 ${currentPrefix}antidelete off – Disable anti-delete feature! 🔓 (Admin Only)
+
+🔗 Anti-Link:
+🔗 ${currentPrefix}antilink on – Enable anti-link feature! 🔒 (Admin Only)
+🔗 ${currentPrefix}antilink off – Disable anti-link feature! 🔓 (Admin Only)
+
+🛍️ Anti-Sales:
+🛍️ ${currentPrefix}antisales on – Enable anti-sales feature! 🔒 (Admin Only)
+🛍️ ${currentPrefix}antisales off – Disable anti-sales feature! 🔓 (Admin Only)
 
 🏆 Hall of Fame:
-📜 .fame – Show the Hall of Fame! 🏆
+📜 ${currentPrefix}fame – Show the Hall of Fame! 🏆
 
 💡 Use commands wisely! Or the bot might just develop a mind of its own… 🤖💀
 
@@ -259,11 +276,11 @@ const disableAntiDeleteCommand = async (sock, chatId, sender) => {
 };
 
 module.exports = {
+    showAllGroupStats,
     sendGroupRules,
     listAdmins,
     sendGroupInfo,
     sendHelpMenu,
-    showAllGroupStats,
     updateUserStats,
     sendJoke,
     sendQuote,

@@ -16,7 +16,8 @@ const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/uti
 const { startBot } = require('../bot/bot');
 const { handleNewImage, startTournament, showTopScorers, showLeaderboard, addGoal, setGoal, endTournament, addPlayer, removePlayer, listPlayers, uploadResult, enableAutoCheckResult, disableAutoCheckResult } = require('./tournamentHandler');
 const { showHallOfFame, addWinner } = require('./hallOfFame');
-
+const { getPrefix, setPrefix } = require('../utils/configUtils');
+const { showAllGroupStats } = require('./commonCommands');
 
 
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
@@ -61,72 +62,112 @@ const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) 
     }
 };
 
-
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
     const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
 
-    if (messageText.startsWith('.antilink on')) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antilink_enabled: true })
-            .eq('group_id', chatId);
 
-        if (error) {
-            console.error('Error enabling anti-link:', error);
-            await sendMessage(sock, chatId, '⚠️ Error enabling anti-link. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '✅ Anti-link has been enabled for this group.');
-        }
-    } else if (messageText.startsWith('.antilink off')) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antilink_enabled: false })
-            .eq('group_id', chatId);
+    // Get the current prefix
+    const currentPrefix = await getPrefix();
 
-        if (error) {
-            console.error('Error disabling anti-link:', error);
-            await sendMessage(sock, chatId, '⚠️ Error disabling anti-link. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '❌ Anti-link has been disabled for this group.');
+    // Handle change prefix command
+    if (messageText.startsWith(`${currentPrefix}prefix`)) {
+        if (sender - config.botOwnerId) {
+            await sendMessage(sock, chatId, '❌ Only the bot owner can change the command prefix.');
+            return
         }
-    } else if (messageText.startsWith('.antisales on')) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antisales_enabled: true })
-            .eq('group_id', chatId);
 
-        if (error) {
-            console.error('Error enabling anti-sales:', error);
-            await sendMessage(sock, chatId, '⚠️ Error enabling anti-sales. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '✅ Anti-sales has been enabled for this group.');
+        const args = messageText.split(' ');
+        if (args.length < 2) {
+            await sendMessage(sock, chatId, '⚠️ Please provide a new prefix.');
+            return;
         }
-    } else if (messageText.startsWith('.antisales off')) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antisales_enabled: false })
-            .eq('group_id', chatId);
 
-        if (error) {
-            console.error('Error disabling anti-sales:', error);
-            await sendMessage(sock, chatId, '⚠️ Error disabling anti-sales. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '❌ Anti-sales has been disabled for this group.');
+        const newPrefix = args[1].trim();
+        if (!newPrefix) {
+            await sendMessage(sock, chatId, '⚠️ Invalid prefix.');
+            return;
         }
-    } else  if (messageText.startsWith('.tagall')) {
-        const repliedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
-        const message = messageText.replace('.tagall', '').trim();
-        await adminCommands.tagAll(sock, chatId, message, sender, repliedMessage);
-    } else if (messageText.startsWith('.help')) {
-        await handleHelpCommand(sock, chatId, sender);
-    } else if (messageText.startsWith('.warn')) {
+
+        // Store the new prefix in the database
+        const success = await setPrefix(newPrefix);
+        if (success) {
+            await sendMessage(sock, chatId, `✅ Command prefix changed to: ${newPrefix}`);
+        } else {
+            await sendMessage(sock, chatId, '⚠️ Error changing command prefix.');
+        }
+        return;
+    }
+
+    if (messageText.startsWith(currentPrefix)) {
+        if (messageText.startsWith(`${currentPrefix}showstats`)) {
+            await showAllGroupStats(sock, chatId);
+        }
+    }  
+
+    // Handle other commands using the current prefix
+    if (messageText.startsWith(currentPrefix)) {
+        if (messageText.startsWith(`${currentPrefix}antilink on`)) {
+            const { error } = await supabase
+                .from('group_settings')
+                .update({ antilink_enabled: true })
+                .eq('group_id', chatId);
+
+            if (error) {
+                console.error('Error enabling anti-link:', error);
+                await sendMessage(sock, chatId, '⚠️ Error enabling anti-link. Please try again later.');
+            } else {
+                await sendMessage(sock, chatId, '✅ Anti-link has been enabled for this group.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}antilink off`)) {
+            const { error } = await supabase
+                .from('group_settings')
+                .update({ antilink_enabled: false })
+                .eq('group_id', chatId);
+
+            if (error) {
+                console.error('Error disabling anti-link:', error);
+                await sendMessage(sock, chatId, '⚠️ Error disabling anti-link. Please try again later.');
+            } else {
+                await sendMessage(sock, chatId, '❌ Anti-link has been disabled for this group.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}antisales on`)) {
+            const { error } = await supabase
+                .from('group_settings')
+                .update({ antisales_enabled: true })
+                .eq('group_id', chatId);
+
+            if (error) {
+                console.error('Error enabling anti-sales:', error);
+                await sendMessage(sock, chatId, '⚠️ Error enabling anti-sales. Please try again later.');
+            } else {
+                await sendMessage(sock, chatId, '✅ Anti-sales has been enabled for this group.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}antisales off`)) {
+            const { error } = await supabase
+                .from('group_settings')
+                .update({ antisales_enabled: false })
+                .eq('group_id', chatId);
+
+            if (error) {
+                console.error('Error disabling anti-sales:', error);
+                await sendMessage(sock, chatId, '⚠️ Error disabling anti-sales. Please try again later.');
+            } else {
+                await sendMessage(sock, chatId, '❌ Anti-sales has been disabled for this group.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}tagall`)) {
+            const repliedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
+            const message = messageText.replace(`${currentPrefix}tagall`, '').trim();
+            await adminCommands.tagAll(sock, chatId, message, sender, repliedMessage);
+        } else if (messageText.startsWith(`${currentPrefix}help`)) {
+            await handleHelpCommand(sock, chatId, sender);
+        } else if (messageText.startsWith(`${currentPrefix}warn`)) {
             if (!await isAdminOrOwner(sock, chatId, sender)) {
                 await sendMessage(sock, chatId, '❌ You must be an admin to issue warnings.');
                 return;
             }
-    
+
             const args = messageText.split(' ').slice(1);
             const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
             
@@ -134,29 +175,29 @@ const handleCommand = async (sock, msg) => {
                 await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
                 return;
             }
-    
+
             const userId = mentions[0];
             const reason = args.slice(1).join(' ') || 'No reason provided';
             const warningThreshold = config.warningThreshold.default;
-    
+
             await issueWarning(sock, chatId, userId, reason, warningThreshold);
-        } else if (messageText.startsWith('.resetwarn')) {
+        } else if (messageText.startsWith(`${currentPrefix}resetwarn`)) {
             if (!await isAdminOrOwner(sock, chatId, sender)) {
                 await sendMessage(sock, chatId, '❌ You must be an admin to reset warnings.');
                 return;
             }
-    
+
             const mentions = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
             
             if (mentions.length === 0) {
                 await sendMessage(sock, chatId, '⚠️ Error: No user mentioned.');
                 return;
             }
-    
+
             const userId = mentions[0];
-    
+
             await resetWarnings(sock, chatId, userId);
-        } else if (messageText.startsWith('.promote')) {
+        } else if (messageText.startsWith(`${currentPrefix}promote`)) {
             if (!await isAdminOrOwner(sock, chatId, sender)) {
                 await sendMessage(sock, chatId, '❌ Only admins or the bot owner can use this command.');
                 return;
@@ -168,210 +209,208 @@ const handleCommand = async (sock, msg) => {
             }
             const userId = mentions[0];
             await adminCommands.promoteUser(sock, chatId, userId, sender);
-    } else if (messageText.startsWith('.antidelete on')) {
-        await enableAntiDelete(chatId);
-        await sendMessage(sock, chatId, '✅ Anti-delete has been enabled for this group.');
-    } else if (messageText.startsWith('.antidelete off')) {
-        await disableAntiDelete(chatId);
-        await sendMessage(sock, chatId, '❌ Anti-delete has been disabled for this group.');
-    } else if (messageText.startsWith('.tagall')) {
-        const message = messageText.replace('.tagall', '').trim();
-        await adminCommands.tagAll(sock, chatId, message, sender);
-    } else if (messageText.startsWith('.ping')) {
-        await sendMessage(sock, chatId, '🏓 Pong!');
-    } else if (messageText.startsWith('.menu')) {
-        await commonCommands.sendHelpMenu(sock, chatId, true, true);
-    } else if (messageText.startsWith('.joke')) {
-        await commonCommands.sendJoke(sock, chatId);
-    } else if (messageText.startsWith('.quote')) {
-        await commonCommands.sendQuote(sock, chatId);
-    } else if (messageText.startsWith('.weather')) {
-        const args = messageText.split(' ').slice(1);
-        await botCommands.handleWeatherCommand(sock, msg, args);
-    } else if (messageText.startsWith('.translate')) {
-        const args = messageText.split(' ').slice(1);
-        await botCommands.handleTranslateCommand(sock, msg, args);
-    } else if (messageText.startsWith('.rules')) {
-        await commonCommands.sendGroupRules(sock, chatId);
-    } else if (messageText.startsWith('.admin')) {
-        await commonCommands.listAdmins(sock, chatId);
-    } else if (messageText.startsWith('.info')) {
-        await commonCommands.sendGroupInfo(sock, chatId, sock.user.id);
-    } else if (messageText.startsWith('.clear')) {
-        await adminCommands.clearChat(sock, chatId);
-    } else if (messageText.startsWith('.ban')) {
-        const args = messageText.split(' ').slice(1);
-        await adminCommands.banUser(sock, chatId, args, sender);
-    } else if (messageText.startsWith('.mute')) {
-        await adminCommands.muteChat(sock, chatId);
-    } else if (messageText.startsWith('.unmute')) {
-        await adminCommands.unmuteChat(sock, chatId);
-    } else if (messageText.startsWith('.announce')) {
-        const message = messageText.replace('.announce', '').trim();
-        await adminCommands.startAnnouncement(sock, chatId, message);
-    } else if (messageText.startsWith('.stopannounce')) {
-        await adminCommands.stopAnnouncement(sock, chatId);
-    } else if (messageText.startsWith('.schedule')) {
-        const args = messageText.split(' ').slice(1); // Split the command into arguments
-        if (args.length < 2) {
-            await sendMessage(sock, chatId, '⚠️ Please provide a valid date and message.');
-            return;
-        }
+        } else if (messageText.startsWith(`${currentPrefix}antidelete on`)) {
+            await enableAntiDelete(chatId);
+            await sendMessage(sock, chatId, '✅ Anti-delete has been enabled for this group.');
+        } else if (messageText.startsWith(`${currentPrefix}antidelete off`)) {
+            await disableAntiDelete(chatId);
+            await sendMessage(sock, chatId, '❌ Anti-delete has been disabled for this group.');
+        } else if (messageText.startsWith(`${currentPrefix}tagall`)) {
+            const message = messageText.replace(`${currentPrefix}tagall`, '').trim();
+            await adminCommands.tagAll(sock, chatId, message, sender);
+        } else if (messageText.startsWith(`${currentPrefix}ping`)) {
+            await sendMessage(sock, chatId, '🏓 Pong!');
+        } else if (messageText.startsWith(`${currentPrefix}menu`)) {
+            await commonCommands.sendHelpMenu(sock, chatId, true, true);
+        } else if (messageText.startsWith(`${currentPrefix}joke`)) {
+            await commonCommands.sendJoke(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}quote`)) {
+            await commonCommands.sendQuote(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}weather`)) {
+            const args = messageText.split(' ').slice(1);
+            await botCommands.handleWeatherCommand(sock, msg, args);
+        } else if (messageText.startsWith(`${currentPrefix}translate`)) {
+            const args = messageText.split(' ').slice(1);
+            await botCommands.handleTranslateCommand(sock, msg, args);
+        } else if (messageText.startsWith(`${currentPrefix}rules`)) {
+            await commonCommands.sendGroupRules(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}admin`)) {
+            await commonCommands.listAdmins(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}info`)) {
+            await commonCommands.sendGroupInfo(sock, chatId, sock.user.id);
+        } else if (messageText.startsWith(`${currentPrefix}clear`)) {
+            await adminCommands.clearChat(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}ban`)) {
+            const args = messageText.split(' ').slice(1);
+            await adminCommands.banUser(sock, chatId, args, sender);
+        } else if (messageText.startsWith(`${currentPrefix}mute`)) {
+            await adminCommands.muteChat(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}unmute`)) {
+            await adminCommands.unmuteChat(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}announce`)) {
+            const message = messageText.replace(`${currentPrefix}announce`, '').trim();
+            await adminCommands.startAnnouncement(sock, chatId, message);
+        } else if (messageText.startsWith(`${currentPrefix}stopannounce`)) {
+            await adminCommands.stopAnnouncement(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}schedule`)) {
+            const args = messageText.split(' ').slice(1); // Split the command into arguments
+            if (args.length < 2) {
+                await sendMessage(sock, chatId, '⚠️ Please provide a valid date and message.');
+                return;
+            }
 
-        await scheduleCommands.scheduleMessage(sock, chatId, args);
-    } else if (messageText.startsWith('.remind')) {
-        const args = messageText.split(' ').slice(1); // Split the command into arguments
-        if (args.length < 2) {
-            await sendMessage(sock, chatId, '⚠️ Please provide a valid time and reminder message.');
-            return;
-        }
+            await scheduleCommands.scheduleMessage(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}remind`)) {
+            const args = messageText.split(' ').slice(1); // Split the command into arguments
+            if (args.length < 2) {
+                await sendMessage(sock, chatId, '⚠️ Please provide a valid time and reminder message.');
+                return;
+            }
 
-        await scheduleCommands.remind(sock, chatId, args);
-    }else if (messageText.startsWith('.listschedule')) {
-        await scheduleCommands.listSchedule(sock, chatId);   
-    } else if (messageText.startsWith('.cancelschedule')) {
-        const args = messageText.split(' ').slice(1);
-        await scheduleCommands.cancelSchedule(sock, chatId, args);
-    } else if (messageText.startsWith('.cancelreminder')) {
-        const args = messageText.split(' ').slice(1);
-        await scheduleCommands.cancelReminder(sock, chatId, args);
-    } else if (messageText.startsWith('.poll')) {
-        const args = messageText.split(' ').slice(1);
-        await pollCommands.createPoll(sock, chatId, args);
-    } else if (messageText.startsWith('.vote')) {
-        const args = messageText.split(' ').slice(1);
-        await pollCommands.vote(sock, chatId, args);
-    } else if (messageText.startsWith('.endpoll')) {
-        await pollCommands.endPoll(sock, chatId);
-    } else if (messageText.startsWith('.starttournament')) {
-        const args = messageText.split(' ').slice(1);
-        await startTournament(sock, chatId, args);
-    } else if (messageText.startsWith('.start best attack')) {
-        const communityName = messageText.split(' ')[3];
-        await startTournament(sock, chatId, communityName, messageText);
-    } else if (messageText.startsWith('.best attack')) {
-        const communityName = messageText.split(' ')[2];
-        await showTopScorers(sock, chatId, communityName);
-    } else if (messageText === '.end best attack') {
-        await endTournament(sock, chatId);
-    } else if (messageText === '.extract') {
-        await handleNewImage(sock, msg);
-    } else if (messageText.startsWith('.goal')) {
-        const [_, playerName, goals] = messageText.split(' ');
-        await addGoal(sock, chatId, playerName.replace('@', ''), parseInt(goals));
-    } else if (messageText.startsWith('.setgoal')) {
-        const [_, playerName, goals] = messageText.split(' ');
-        await setGoal(sock, chatId, playerName.replace('@', ''), parseInt(goals));
-    } else if (messageText === '.top scorers') {
-        await showLeaderboard(sock, chatId);
-    } else if (messageText.startsWith('.add player')) {
-        const [_, playerName, team, community] = messageText.split(' ');
-        await addPlayer(sock, chatId, playerName, team, community);
-    } else if (messageText.startsWith('.remove player')) {
-        const [_, playerName, community] = messageText.split(' ');
-        await removePlayer(sock, chatId, playerName, community);
-    } else if (messageText.startsWith('.list players')) {
-        const community = messageText.split(' ')[2];
-        await listPlayers(sock, chatId, community);
-    } else if (messageText.startsWith('.upload result')) {
-        const imagePath = await downloadImage(msg);
-        await uploadResult(sock, chatId, imagePath);
-    } else if (messageText === '.auto check result') {
-        await enableAutoCheckResult(sock, chatId);
-    } else if (messageText === '.auto check result off') {
-        await disableAutoCheckResult(sock, chatId);
-    } else if (messageText.startsWith('.setgrouprules')) {
-        const args = messageText.split(' ').slice(1);
-        await adminCommands.setGroupRules(sock, chatId, args.join(' '));
-    } else if (messageText.startsWith('.settournamentrules')) {
-        const args = messageText.split(' ').slice(1);
-        await adminCommands.setTournamentRules(sock, chatId, args.join(' '));
-    } else if (messageText.startsWith('.setlanguage')) {
-        const args = messageText.split(' ').slice(1);
-        await adminCommands.setLanguage(sock, chatId, args.join(' '));
-    } else if (messageText.startsWith('.showstats')) {
-        await showGroupStats(sock, chatId);
-    } else if (messageText.startsWith('.delete')) {
-        await adminCommands.deleteMessage(sock, chatId, msg);
-    } else if (messageText.startsWith('.enable')) {
-        await adminCommands.enableBot(sock, chatId, sender);
-    } else if (messageText.startsWith('.disable')) {
-        await adminCommands.disableBot(sock, chatId, sender);
-    } else if (messageText.startsWith('.startwelcome')) {
-        await adminCommands.startWelcome(sock, chatId);
-    } else if (messageText.startsWith('.stopwelcome')) {
-        await adminCommands.stopWelcome(sock, chatId);
-    } else if (messageText.startsWith('.promote')) {
-        const userId = messageText.split(' ')[1];
-        await adminCommands.promoteUser(sock, chatId, userId);
-    } else if (messageText.startsWith('.demote')) {
-        const userId = messageText.split(' ')[1];
-        await adminCommands.demoteUser(sock, chatId, userId);
-    } else if (messageText.startsWith('.warn')) {
-        const args = messageText.split(' ').slice(1);
-        if (args.length > 1) {
-            const userId = args[0];
-            const reason = args.slice(1).join(' ');
-            await issueWarning(sock, chatId, userId, reason, config.warningThreshold);
-        } else {
-            await sendMessage(sock, chatId, '⚠️ Please provide a user ID and reason for the warning.');
-        }
-    } else if (messageText.startsWith('.listwarn')) {
-        await listWarnings(sock, chatId);
-    } else if (messageText.startsWith('.resetwarn')) {
-        const args = messageText.split(' ').slice(1);
-        if (args.length > 0) {
-            const userId = args[0];
-            await resetWarnings(sock, chatId, userId);
-        } else {
-            await sendMessage(sock, chatId, '⚠️ Please provide a user ID to reset warnings.');
-        }
-    } else if (messageText.startsWith('.fame')) {
-        await showHallOfFame(sock, chatId);
-    } else if (messageText.startsWith('.sharelink')) {
-        const args = messageText.split(' ').slice(1);
-        await botCommands.handleShareLinkCommand(sock, chatId, args);
-    } else if (messageText.startsWith('.addwinner')) {
-        const args = messageText.split(' ').slice(1);
-        const [username, league, team] = args.join(' ').split(',');
-        await addWinner(sock, chatId, sender, league.trim(), team.trim(), username.trim());
-    } else if (messageText.startsWith('.startgoodbye')) {
-        if (!await isAdminOrOwner(sock, chatId, sender)) {
-            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can enable goodbye messages.');
-            return;
-        }
+            await scheduleCommands.remind(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}listschedule`)) {
+            await scheduleCommands.listSchedule(sock, chatId);   
+        } else if (messageText.startsWith(`${currentPrefix}cancelschedule`)) {
+            const args = messageText.split(' ').slice(1);
+            await scheduleCommands.cancelSchedule(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}cancelreminder`)) {
+            const args = messageText.split(' ').slice(1);
+            await scheduleCommands.cancelReminder(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}poll`)) {
+            const args = messageText.split(' ').slice(1);
+            await pollCommands.createPoll(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}vote`)) {
+            const args = messageText.split(' ').slice(1);
+            await pollCommands.vote(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}endpoll`)) {
+            await pollCommands.endPoll(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}starttournament`)) {
+            const args = messageText.split(' ').slice(1);
+            await startTournament(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}start best attack`)) {
+            const communityName = messageText.split(' ')[3];
+            await startTournament(sock, chatId, communityName, messageText);
+        } else if (messageText.startsWith(`${currentPrefix}best attack`)) {
+            const communityName = messageText.split(' ')[2];
+            await showTopScorers(sock, chatId, communityName);
+        } else if (messageText === `${currentPrefix}end best attack`) {
+            await endTournament(sock, chatId);
+        } else if (messageText === `${currentPrefix}extract`) {
+            await handleNewImage(sock, msg);
+        } else if (messageText.startsWith(`${currentPrefix}goal`)) {
+            const [_, playerName, goals] = messageText.split(' ');
+            await addGoal(sock, chatId, playerName.replace('@', ''), parseInt(goals));
+        } else if (messageText.startsWith(`${currentPrefix}setgoal`)) {
+            const [_, playerName, goals] = messageText.split(' ');
+            await setGoal(sock, chatId, playerName.replace('@', ''), parseInt(goals));
+        } else if (messageText === `${currentPrefix}top scorers`) {
+            await showLeaderboard(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}add player`)) {
+            const [_, playerName, team, community] = messageText.split(' ');
+            await addPlayer(sock, chatId, playerName, team, community);
+        } else if (messageText.startsWith(`${currentPrefix}remove player`)) {
+            const [_, playerName, community] = messageText.split(' ');
+            await removePlayer(sock, chatId, playerName, community);
+        } else if (messageText.startsWith(`${currentPrefix}list players`)) {
+            const community = messageText.split(' ')[2];
+            await listPlayers(sock, chatId, community);
+        } else if (messageText.startsWith(`${currentPrefix}upload result`)) {
+            const imagePath = await downloadImage(msg);
+            await uploadResult(sock, chatId, imagePath);
+        } else if (messageText === `${currentPrefix}auto check result`) {
+            await enableAutoCheckResult(sock, chatId);
+        } else if (messageText === `${currentPrefix}auto check result off`) {
+            await disableAutoCheckResult(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}setgrouprules`)) {
+            const args = messageText.split(' ').slice(1);
+            await adminCommands.setGroupRules(sock, chatId, args.join(' '));
+        } else if (messageText.startsWith(`${currentPrefix}settournamentrules`)) {
+            const args = messageText.split(' ').slice(1);
+            await adminCommands.setTournamentRules(sock, chatId, args.join(' '));
+        } else if (messageText.startsWith(`${currentPrefix}setlanguage`)) {
+            const args = messageText.split(' ').slice(1);
+            await adminCommands.setLanguage(sock, chatId, args.join(' '));
+        } else if (messageText.startsWith(`${currentPrefix}delete`)) {
+            await adminCommands.deleteMessage(sock, chatId, msg);
+        } else if (messageText.startsWith(`${currentPrefix}enable`)) {
+            await adminCommands.enableBot(sock, chatId, sender);
+        } else if (messageText.startsWith(`${currentPrefix}disable`)) {
+            await adminCommands.disableBot(sock, chatId, sender);
+        } else if (messageText.startsWith(`${currentPrefix}startwelcome`)) {
+            await adminCommands.startWelcome(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}stopwelcome`)) {
+            await adminCommands.stopWelcome(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}promote`)) {
+            const userId = messageText.split(' ')[1];
+            await adminCommands.promoteUser(sock, chatId, userId);
+        } else if (messageText.startsWith(`${currentPrefix}demote`)) {
+            const userId = messageText.split(' ')[1];
+            await adminCommands.demoteUser(sock, chatId, userId);
+        } else if (messageText.startsWith(`${currentPrefix}warn`)) {
+            const args = messageText.split(' ').slice(1);
+            if (args.length > 1) {
+                const userId = args[0];
+                const reason = args.slice(1).join(' ');
+                await issueWarning(sock, chatId, userId, reason, config.warningThreshold);
+            } else {
+                await sendMessage(sock, chatId, '⚠️ Please provide a user ID and reason for the warning.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}listwarn`)) {
+            await listWarnings(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}resetwarn`)) {
+            const args = messageText.split(' ').slice(1);
+            if (args.length > 0) {
+                const userId = args[0];
+                await resetWarnings(sock, chatId, userId);
+            } else {
+                await sendMessage(sock, chatId, '⚠️ Please provide a user ID to reset warnings.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}fame`)) {
+            await showHallOfFame(sock, chatId);
+        } else if (messageText.startsWith(`${currentPrefix}sharelink`)) {
+            const args = messageText.split(' ').slice(1);
+            await botCommands.handleShareLinkCommand(sock, chatId, args);
+        } else if (messageText.startsWith(`${currentPrefix}addwinner`)) {
+            const args = messageText.split(' ').slice(1);
+            const [username, league, team] = args.join(' ').split(',');
+            await addWinner(sock, chatId, sender, league.trim(), team.trim(), username.trim());
+        } else if (messageText.startsWith(`${currentPrefix}startgoodbye`)) {
+            if (!await isAdminOrOwner(sock, chatId, sender)) {
+                await sendMessage(sock, chatId, '❌ Only admins or the bot owner can enable goodbye messages.');
+                return;
+            }
 
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ goodbye_messages_enabled: true })
-            .eq('group_id', chatId);
+            const { error } = await supabase
+                .from('group_settings')
+                .update({ goodbye_messages_enabled: true })
+                .eq('group_id', chatId);
 
-        if (error) {
-            console.error('Error enabling goodbye messages:', error);
-            await sendMessage(sock, chatId, '⚠️ Error enabling goodbye messages. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled for this group.');
-        }
-    } else if (messageText.startsWith('.stopgoodbye')) {
-        if (!await isAdminOrOwner(sock, chatId, sender)) {
-            await sendMessage(sock, chatId, '❌ Only admins or the bot owner can disable goodbye messages.');
-            return;
-        }
+            if (error) {
+                console.error('Error enabling goodbye messages:', error);
+                await sendMessage(sock, chatId, '⚠️ Error enabling goodbye messages. Please try again later.');
+            } else {
+                await sendMessage(sock, chatId, '✅ Goodbye messages have been enabled for this group.');
+            }
+        } else if (messageText.startsWith(`${currentPrefix}stopgoodbye`)) {
+            if (!await isAdminOrOwner(sock, chatId, sender)) {
+                await sendMessage(sock, chatId, '❌ Only admins or the bot owner can disable goodbye messages.');
+                return;
+            }
 
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ goodbye_messages_enabled: false })
-            .eq('group_id', chatId);
+            const { error } = await supabase
+                .from('group_settings')
+                .update({ goodbye_messages_enabled: false })
+                .eq('group_id', chatId);
 
-        if (error) {
-            console.error('Error disabling goodbye messages:', error);
-            await sendMessage(sock, chatId, '⚠️ Error disabling goodbye messages. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '❌ Goodbye messages have been disabled for this group.');
+            if (error) {
+                console.error('Error disabling goodbye messages:', error);
+                await sendMessage(sock, chatId, '⚠️ Error disabling goodbye messages. Please try again later.');
+            } else {
+                await sendMessage(sock, chatId, '❌ Goodbye messages have been disabled for this group.');
+            }
         }
     }
 };
-
 
 const handleIncomingMessages = async (sock, m) => {
     let chatId;
