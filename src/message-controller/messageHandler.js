@@ -67,7 +67,55 @@ const handleCommand = async (sock, msg) => {
     const sender = msg.key.participant || msg.key.remoteJid;
     const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
 
-    if (messageText.startsWith('.tagall')) {
+    if (messageText.startsWith('.antilink on')) {
+        const { error } = await supabase
+            .from('group_settings')
+            .update({ antilink_enabled: true })
+            .eq('group_id', chatId);
+
+        if (error) {
+            console.error('Error enabling anti-link:', error);
+            await sendMessage(sock, chatId, '⚠️ Error enabling anti-link. Please try again later.');
+        } else {
+            await sendMessage(sock, chatId, '✅ Anti-link has been enabled for this group.');
+        }
+    } else if (messageText.startsWith('.antilink off')) {
+        const { error } = await supabase
+            .from('group_settings')
+            .update({ antilink_enabled: false })
+            .eq('group_id', chatId);
+
+        if (error) {
+            console.error('Error disabling anti-link:', error);
+            await sendMessage(sock, chatId, '⚠️ Error disabling anti-link. Please try again later.');
+        } else {
+            await sendMessage(sock, chatId, '❌ Anti-link has been disabled for this group.');
+        }
+    } else if (messageText.startsWith('.antisales on')) {
+        const { error } = await supabase
+            .from('group_settings')
+            .update({ antisales_enabled: true })
+            .eq('group_id', chatId);
+
+        if (error) {
+            console.error('Error enabling anti-sales:', error);
+            await sendMessage(sock, chatId, '⚠️ Error enabling anti-sales. Please try again later.');
+        } else {
+            await sendMessage(sock, chatId, '✅ Anti-sales has been enabled for this group.');
+        }
+    } else if (messageText.startsWith('.antisales off')) {
+        const { error } = await supabase
+            .from('group_settings')
+            .update({ antisales_enabled: false })
+            .eq('group_id', chatId);
+
+        if (error) {
+            console.error('Error disabling anti-sales:', error);
+            await sendMessage(sock, chatId, '⚠️ Error disabling anti-sales. Please try again later.');
+        } else {
+            await sendMessage(sock, chatId, '❌ Anti-sales has been disabled for this group.');
+        }
+    } else  if (messageText.startsWith('.tagall')) {
         const repliedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
         const message = messageText.replace('.tagall', '').trim();
         await adminCommands.tagAll(sock, chatId, message, sender, repliedMessage);
@@ -324,6 +372,7 @@ const handleCommand = async (sock, msg) => {
     }
 };
 
+
 const handleIncomingMessages = async (sock, m) => {
     let chatId;
     try {
@@ -378,9 +427,11 @@ const handleIncomingMessages = async (sock, m) => {
             console.log('📩 Processing group/channel message');
         }
 
+        // Handle protection messages
+        await handleProtectionMessages(sock, message);
+
         if (!msgText.trim().startsWith(config.botSettings.commandPrefix)) {
             console.log('🛑 Ignoring non-command message');
-            await handleProtectionMessages(sock, message);
             return;
         }
 
@@ -410,7 +461,7 @@ const handleIncomingMessages = async (sock, m) => {
             await sendMessage(sock, chatId, '⚠️ *An unexpected error occurred. Please try again later.*');
         }
     }
-};
+}
 
 const callCommand = async (sock, chatId, command) => {
     try {

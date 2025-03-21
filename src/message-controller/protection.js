@@ -1,19 +1,7 @@
 const { sendMessage, sendReaction } = require('../utils/messageUtils');
 const supabase = require('../supabaseClient');
-const { issueWarning, resetWarnings, listWarnings, getRemainingWarnings } = require('../message-controller/warning');
+const { issueWarning, getRemainingWarnings } = require('../message-controller/warning');
 const config = require('../config/config');
-const { updateUserStats } = require('../utils/utils');
-const commonCommands = require('../message-controller/commonCommands');
-const adminCommands = require('../message-controller/adminActions');
-const botCommands = require('../message-controller/botCommands');
-const scheduleCommands = require('../message-controller/scheduleMessage');
-const pollCommands = require('../message-controller/polls');
-const tournamentCommands = require('../message-controller/tournament');
-const { exec } = require("child_process");
-const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
-const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
-const { startBot } = require('../bot/bot');
-
 
 const salesKeywords = [
     'sell', 'sale', 'selling', 'buy', 'buying', 'trade', 'trading', 'swap', 'swapping', 'exchange', 'price',
@@ -22,6 +10,30 @@ const salesKeywords = [
 ];
 
 const linkRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|wa\.me\/[^\s]+|chat\.whatsapp\.com\/[^\s]+|t\.me\/[^\s]+|bit\.ly\/[^\s]+|[\w-]+\.(com|net|org|info|biz|xyz|live|tv|me|link)(\/\S*)?)/gi;
+
+const groupMetadataCache = new Map(); // Store group metadata temporarily
+
+const getGroupMetadata = async (sock, chatId) => {
+    // If data exists and is less than 5 minutes old, return cached data
+    if (groupMetadataCache.has(chatId)) {
+        const cachedData = groupMetadataCache.get(chatId);
+        if (Date.now() - cachedData.timestamp < 300000) { // 5 minutes
+            console.log(`✅ Using cached group metadata for ${chatId}`);
+            return cachedData.data;
+        }
+    }
+
+    // Fetch new group metadata
+    try {
+        const metadata = await sock.groupMetadata(chatId);
+        groupMetadataCache.set(chatId, { data: metadata, timestamp: Date.now() });
+        console.log(`🔄 Fetched new group metadata for ${chatId}`);
+        return metadata;
+    } catch (error) {
+        console.error("⚠️ Error fetching group metadata:", error);
+        return null; // Return null to prevent crashes
+    }
+};
 
 const handleProtectionMessages = async (sock, message) => {
     const chatId = message.key.remoteJid;
@@ -32,7 +44,7 @@ const handleProtectionMessages = async (sock, message) => {
     if (chatId.endsWith('@g.us') || chatId.endsWith('@broadcast')) {
         const { data, error } = await supabase
             .from('group_settings')
-            .select('bot_enabled')
+            .select('bot_enabled, antilink_enabled, antisales_enabled')
             .eq('group_id', chatId)
             .single();
         groupSettings = data;
@@ -54,13 +66,8 @@ const handleProtectionMessages = async (sock, message) => {
         console.log(`Checking message for protection: ${msgText} from ${sender} in ${chatId}`);
 
         // Get group metadata to check admin status
-        let groupMetadata;
-        try {
-            groupMetadata = await sock.groupMetadata(chatId);
-        } catch (error) {
-            console.error('Error fetching group metadata:', error);
-            return;
-        }
+        const groupMetadata = await getGroupMetadata(sock, chatId);
+        if (!groupMetadata) return;
 
         const isAdmin = groupMetadata.participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
 
@@ -70,36 +77,40 @@ const handleProtectionMessages = async (sock, message) => {
         }
 
         // **Sales Content Detection**
-        const containsSalesKeywords = salesKeywords.some(keyword => msgText.toLowerCase().includes(keyword));
-        if (containsSalesKeywords && (message.message?.imageMessage || message.message?.videoMessage)) {
-            await sock.sendMessage(chatId, { delete: message.key });
-            console.log(`⚠️ Media message from ${sender} deleted in group: ${chatId} (sales content detected)`);
+        if (groupSettings.antisales_enabled) {
+            const containsSalesKeywords = salesKeywords.some(keyword => msgText.toLowerCase().includes(keyword));
+            if (containsSalesKeywords && (message.message?.imageMessage || message.message?.videoMessage)) {
+                await sock.sendMessage(chatId, { delete: message.key });
+                console.log(`⚠️ Media message from ${sender} deleted in group: ${chatId} (sales content detected)`);
 
-            // **Send warning request to warning.js**
-            const remainingWarnings = await getRemainingWarnings(chatId, sender, 'sales');
-            if (remainingWarnings <= 0) {
-                await sock.groupParticipantsUpdate(chatId, [sender], 'remove');
-                console.log(`🚫 User ${sender} kicked from group: ${chatId} after reaching sales warning threshold.`);
-            } else {
-                await issueWarning(sock, chatId, sender, "Posting sales content", config.warningThreshold.sales);
+                // **Send warning request to warning.js**
+                const remainingWarnings = await getRemainingWarnings(chatId, sender, 'sales');
+                if (remainingWarnings <= 0) {
+                    await sock.groupParticipantsUpdate(chatId, [sender], 'remove');
+                    console.log(`🚫 User ${sender} kicked from group: ${chatId} after reaching sales warning threshold.`);
+                } else {
+                    await issueWarning(sock, chatId, sender, "Posting sales content", config.warningThreshold.sales);
+                }
+                return;
             }
-            return;
         }
 
         // **Link Detection**
-        if (linkRegex.test(msgText)) {
-            await sock.sendMessage(chatId, { delete: message.key });
-            console.log(`⚠️ Message from ${sender} deleted in group: ${chatId} (link detected)`);
+        if (groupSettings.antilink_enabled) {
+            if (linkRegex.test(msgText)) {
+                await sock.sendMessage(chatId, { delete: message.key });
+                console.log(`⚠️ Message from ${sender} deleted in group: ${chatId} (link detected)`);
 
-            // **Send warning request to warning.js**
-            const remainingWarnings = await getRemainingWarnings(chatId, sender, 'links');
-            if (remainingWarnings <= 0) {
-                await sock.groupParticipantsUpdate(chatId, [sender], 'remove');
-                console.log(`🚫 User ${sender} kicked from group: ${chatId} after reaching link warning threshold.`);
-            } else {
-                await issueWarning(sock, chatId, sender, "Posting links", config.warningThreshold.links);
+                // **Send warning request to warning.js**
+                const remainingWarnings = await getRemainingWarnings(chatId, sender, 'links');
+                if (remainingWarnings <= 0) {
+                    await sock.groupParticipantsUpdate(chatId, [sender], 'remove');
+                    console.log(`🚫 User ${sender} kicked from group: ${chatId} after reaching link warning threshold.`);
+                } else {
+                    await issueWarning(sock, chatId, sender, "Posting links", config.warningThreshold.links);
+                }
+                return;
             }
-            return;
         }
     } catch (error) {
         console.error('Error handling protection messages:', error);
