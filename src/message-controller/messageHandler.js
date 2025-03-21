@@ -12,7 +12,7 @@ const tournamentCommands = require('../message-controller/tournament');
 const { handleProtectionMessages, handleAntiDelete, enableAntiDelete, disableAntiDelete } = require('../message-controller/protection');
 const { exec } = require("child_process");
 const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
-const { formatResponseWithHeaderFooter, welcomeMessage } = require('../utils/utils');
+const { formatResponseWithHeaderFooter, welcomeMessage, setWelcomeMessage } = require('../utils/utils');
 const { startBot } = require('../bot/bot');
 const { handleNewImage, startTournament, showTopScorers, showLeaderboard, addGoal, setGoal, endTournament, addPlayer, removePlayer, listPlayers, uploadResult, enableAutoCheckResult, disableAutoCheckResult } = require('./tournamentHandler');
 const { showHallOfFame, addWinner } = require('./hallOfFame');
@@ -107,6 +107,28 @@ const handleCommand = async (sock, msg) => {
     }  
 
     // Handle other commands using the current prefix
+
+
+
+    
+    // Handle set welcome message command
+    if (messageText.startsWith(`${currentPrefix}setwelcome`)) {
+        const args = messageText.split(' ').slice(1);
+        const newWelcomeMessage = args.join(' ');
+
+        if (!newWelcomeMessage) {
+            await sendMessage(sock, chatId, '⚠️ Please provide a new welcome message.');
+            return;
+        }
+
+        const success = await setWelcomeMessage(chatId, newWelcomeMessage);
+        if (success) {
+            await sendMessage(sock, chatId, '✅ Welcome message updated successfully.');
+        } else {
+            await sendMessage(sock, chatId, '⚠️ Error updating welcome message.');
+        }
+        return;
+    }
     if (messageText.startsWith(currentPrefix)) {
         if (messageText.startsWith(`${currentPrefix}antilink on`)) {
             const { error } = await supabase
@@ -571,7 +593,8 @@ const handleGroupParticipantsUpdate = async (sock, update) => {
         }
 
         if (update.action === 'add' && groupSettings && groupSettings.welcome_messages_enabled) {
-            await sock.sendMessage(chat.id, { text: formatResponseWithHeaderFooter(welcomeMessage(chat.subject, user)) });
+            const welcomeMsg = await welcomeMessage(chat.subject, user, update.id);
+            await sock.sendMessage(chat.id, { text: formatResponseWithHeaderFooter(welcomeMsg), mentions: [contact] });
             console.log(`👋 Sent welcome message to ${user}`);
         }
 

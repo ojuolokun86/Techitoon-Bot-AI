@@ -32,8 +32,23 @@ ${message}
 `;
 };
 
-const welcomeMessage = (groupName, user) => {
-    return `🔥 Welcome to ${groupName}, @${user}! 🔥
+const welcomeMessage = async (groupName, user, chatId) => {
+    const { data, error } = await supabase
+        .from('group_settings')
+        .select('welcome_message')
+        .eq('group_id', chatId)
+        .single();
+
+    if (error) {
+        console.error('Error fetching custom welcome message:', error);
+    }
+
+    const customMessage = data?.welcome_message;
+
+    if (customMessage) {
+        return customMessage.replace('{user}', `@${user}`);
+    } else {
+        return `🔥 Welcome to ${groupName}, @${user}! 🔥
 
 🏆 This is where legends rise, champions battle, and history is made! ⚽💥 Get ready for intense competitions, thrilling matches, and unforgettable moments on the pitch.
 
@@ -43,6 +58,20 @@ const welcomeMessage = (groupName, user) => {
 🔹 Stay active, stay competitive, and most importantly… HAVE FUN!
 
 👑 Welcome to the ${groupName}! Now, let’s make history! 🔥⚽`;
+    }
+};
+
+const setWelcomeMessage = async (chatId, message) => {
+    const { error } = await supabase
+        .from('group_settings')
+        .upsert({ group_id: chatId, welcome_message: message }, { onConflict: ['group_id'] });
+
+    if (error) {
+        console.error('Error setting custom welcome message:', error);
+        return false;
+    }
+
+    return true;
 };
 
 const updateUserStats = async (userId, command) => {
@@ -119,6 +148,7 @@ module.exports = {
     manageUserStats,
     formatResponseWithHeaderFooter,
     welcomeMessage,
+    setWelcomeMessage,
     updateUserStats,
     showGroupStats,
     warnUser,
