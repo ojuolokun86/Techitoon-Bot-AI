@@ -126,78 +126,6 @@ const handleProtectionMessages = async (sock, message) => {
     }
 };
 
-const handleProtectionCommands = async (sock, message) => {
-    const chatId = message.key.remoteJid;
-    const sender = message.key.participant || message.key.remoteJid;
-    const msgText = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
-    const currentPrefix = await getPrefix();
-
-    if (!msgText.startsWith(currentPrefix)) return;
-
-    const args = msgText.slice(currentPrefix.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
-
-    if (command === 'antilink' || command === 'antisales') {
-        const subCommand = args.shift()?.toLowerCase();
-        const targetUser = args[0]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-
-        if (!subCommand) {
-            await sendMessage(sock, chatId, 'Please specify a valid subcommand: `permit`, `nopermit`, or `permitnot`.');
-            return;
-        }
-
-        if (subCommand === 'permit') {
-            if (!targetUser) {
-                await sendMessage(sock, chatId, 'Please mention a user to permit.');
-                return;
-            }
-
-            const { error } = await supabase
-                .from(`${command}_permissions`)
-                .insert([{ group_id: chatId, user_id: targetUser }]);
-
-            if (error) {
-                console.error(`Error permitting user for ${command}:`, error);
-                await sendMessage(sock, chatId, `Failed to permit user for ${command}.`);
-            } else {
-                await sendMessage(sock, chatId, `✅ User @${targetUser.split('@')[0]} is now permitted to bypass ${command}.`);
-            }
-        } else if (subCommand === 'nopermit') {
-            if (!targetUser) {
-                await sendMessage(sock, chatId, 'Please mention a user to remove permission.');
-                return;
-            }
-
-            const { error } = await supabase
-                .from(`${command}_permissions`)
-                .delete()
-                .eq('group_id', chatId)
-                .eq('user_id', targetUser);
-
-            if (error) {
-                console.error(`Error removing permission for user in ${command}:`, error);
-                await sendMessage(sock, chatId, `Failed to remove permission for user in ${command}.`);
-            } else {
-                await sendMessage(sock, chatId, `❌ User @${targetUser.split('@')[0]} is no longer permitted to bypass ${command}.`);
-            }
-        } else if (subCommand === 'permitnot') {
-            const { error } = await supabase
-                .from(`${command}_permissions`)
-                .delete()
-                .eq('group_id', chatId);
-
-            if (error) {
-                console.error(`Error clearing permissions for ${command}:`, error);
-                await sendMessage(sock, chatId, `Failed to clear permissions for ${command}.`);
-            } else {
-                await sendMessage(sock, chatId, `✅ All permissions for ${command} have been cleared.`);
-            }
-        } else {
-            await sendMessage(sock, chatId, 'Invalid subcommand. Use `permit`, `nopermit`, or `permitnot`.');
-        }
-    }
-};
-
 let antiDeleteGroups = new Set(); // Store groups with anti-delete enabled
 
 const enableAntiDelete = async (chatId) => {
@@ -311,4 +239,4 @@ const deleteOldMessages = async () => {
 // Run every hour
 setInterval(deleteOldMessages, 60 * 60 * 1000);
 
-module.exports = { handleProtectionMessages, handleAntiDelete, initializeMessageCache, enableAntiDelete, disableAntiDelete, handleProtectionCommands };
+module.exports = { handleProtectionMessages, handleAntiDelete, initializeMessageCache, enableAntiDelete, disableAntiDelete };

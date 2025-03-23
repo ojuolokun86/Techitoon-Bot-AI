@@ -35,28 +35,14 @@ ${message}
 `;
 };
 
-const welcomeMessage = async (groupName, user, chatId) => {
-    const { data, error } = await supabase
-        .from('group_settings')
-        .select('welcome_message')
-        .eq('group_id', chatId)
-        .single();
+const welcomeMessage = async (sock, groupName, user, chatId) => {
+    // Debugging logs
+    console.log('🔍 Full sock object in welcomeMessage:', sock);
+    console.log('🔍 Type of sock:', typeof sock);
+    console.log('🔍 Type of sock.sendMessage:', typeof sock.sendMessage);
 
-    if (error) {
-        console.error('Error fetching custom welcome message:', error);
-    }
-
-    const customMessage = data?.welcome_message;
-
-    if (customMessage) {
-        // Replace `{user}` with the user's mention
-        return {
-            text: customMessage.replace('{user}', `@${user.split('@')[0]}`),
-            mentions: [user], // Add the user to the mentions array
-        };
-    } else {
-        // Default welcome message
-        const defaultMessage = `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
+    // Predefined or default welcome message
+    const welcomeText = `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
 
 🏆 This is where legends rise, champions battle, and history is made! ⚽💥 Get ready for intense competitions, thrilling matches, and unforgettable moments on the pitch.
 
@@ -67,10 +53,17 @@ const welcomeMessage = async (groupName, user, chatId) => {
 
 👑 Welcome to the ${groupName}! Now, let’s make history! 🔥⚽`;
 
-        return {
-            text: defaultMessage,
+    const formattedMessage = formatResponseWithHeaderFooter(welcomeText);
+
+    // Send the message with proper WhatsApp mention
+    if (sock && typeof sock.sendMessage === 'function') {
+        await sock.sendMessage(chatId, {
+            text: formattedMessage,
             mentions: [user], // Add the user to the mentions array
-        };
+        });
+        console.log(`👋 Sent welcome message to ${user}`);
+    } else {
+        console.error('sock.sendMessage is not a function or sock is undefined.');
     }
 };
 

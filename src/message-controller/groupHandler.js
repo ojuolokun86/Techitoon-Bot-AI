@@ -23,8 +23,17 @@ const handleGroupParticipantsUpdate = async (sock, update) => {
 
         // Handle welcome messages
         if (update.action === 'add' && groupSettings && groupSettings.welcome_messages_enabled) {
-            await sock.sendMessage(chat.id, { text: formatResponseWithHeaderFooter(welcomeMessage(chat.subject, user)) });
-            console.log(`👋 Sent welcome message to ${user}`);
+            const groupMetadata = await sock.groupMetadata(update.id);
+            const groupName = groupMetadata.subject;
+
+            console.log('sock object before calling welcomeMessage:', sock); // Debugging log
+            console.log('Type of sock.sendMessage:', typeof sock.sendMessage); // Debugging log
+
+            if (typeof sock.sendMessage === 'function') {
+                await welcomeMessage(sock, groupName, contact, update.id);
+            } else {
+                console.error('Invalid sock object. sock.sendMessage is not a function.');
+            }
         }
 
         // Handle goodbye messages
@@ -40,10 +49,12 @@ const handleGroupParticipantsUpdate = async (sock, update) => {
                 goodbyeMessage = leftMessages[randomIndex].replace('${participant}', user);
             }
 
+            console.log('Generated goodbye message:', goodbyeMessage); // Debugging log
+
             // Send the goodbye message
             await sock.sendMessage(chat.id, {
                 text: goodbyeMessage,
-                mentions: [contact]
+                mentions: [contact],
             });
             console.log(`👋 Sent goodbye message to ${contact}`);
         }
