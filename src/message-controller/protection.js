@@ -2,6 +2,7 @@ const { sendMessage, sendReaction } = require('../utils/messageUtils');
 const supabase = require('../supabaseClient');
 const { issueWarning, getRemainingWarnings } = require('../message-controller/warning');
 const config = require('../config/config');
+const { getPrefix } = require('../utils/configUtils');
 
 const salesKeywords = [
     'sell', 'sale', 'selling', 'buy', 'buying', 'trade', 'trading', 'swap', 'swapping', 'exchange', 'price',
@@ -53,8 +54,14 @@ const handleProtectionMessages = async (sock, message) => {
         }
     }
 
+    // Check if groupSettings is null or undefined
+    if (!groupSettings) {
+        console.log('⚠️ No group settings found for this group. Skipping protection actions.');
+        return;
+    }
+
     // Check if the bot is enabled in the group/channel
-    if ((chatId.endsWith('@g.us') || chatId.endsWith('@broadcast')) && (!groupSettings || !groupSettings.bot_enabled)) {
+    if (!groupSettings.bot_enabled) {
         console.log('🛑 Bot is disabled in this group/channel. Skipping protection actions.');
         return;
     }
@@ -65,14 +72,16 @@ const handleProtectionMessages = async (sock, message) => {
 
         console.log(`Checking message for protection: ${msgText} from ${sender} in ${chatId}`);
 
-        // Get group metadata to check admin status
-        const groupMetadata = await getGroupMetadata(sock, chatId);
-        if (!groupMetadata) return;
+        // Check if the user is permitted to bypass antilink or antisales
+        const { data: permittedUsers } = await supabase
+            .from('antilink_permissions')
+            .select('user_id')
+            .eq('group_id', chatId);
 
-        const isAdmin = groupMetadata.participants.some(p => p.id === sender && (p.admin === 'admin' || p.admin === 'superadmin'));
+        const isPermitted = permittedUsers?.some(user => user.user_id === sender);
 
-        if (isAdmin) {
-            console.log(`Skipping protection check for admin: ${sender}`);
+        if (isPermitted) {
+            console.log(`User ${sender} is permitted to bypass protection.`);
             return;
         }
 
@@ -114,6 +123,78 @@ const handleProtectionMessages = async (sock, message) => {
         }
     } catch (error) {
         console.error('Error handling protection messages:', error);
+    }
+};
+
+const handleProtectionCommands = async (sock, message) => {
+    const chatId = message.key.remoteJid;
+    const sender = message.key.participant || message.key.remoteJid;
+    const msgText = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
+    const currentPrefix = await getPrefix();
+
+    if (!msgText.startsWith(currentPrefix)) return;
+
+    const args = msgText.slice(currentPrefix.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    if (command === 'antilink' || command === 'antisales') {
+        const subCommand = args.shift()?.toLowerCase();
+        const targetUser = args[0]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+        if (!subCommand) {
+            await sendMessage(sock, chatId, 'Please specify a valid subcommand: `permit`, `nopermit`, or `permitnot`.');
+            return;
+        }
+
+        if (subCommand === 'permit') {
+            if (!targetUser) {
+                await sendMessage(sock, chatId, 'Please mention a user to permit.');
+                return;
+            }
+
+            const { error } = await supabase
+                .from(`${command}_permissions`)
+                .insert([{ group_id: chatId, user_id: targetUser }]);
+
+            if (error) {
+                console.error(`Error permitting user for ${command}:`, error);
+                await sendMessage(sock, chatId, `Failed to permit user for ${command}.`);
+            } else {
+                await sendMessage(sock, chatId, `✅ User @${targetUser.split('@')[0]} is now permitted to bypass ${command}.`);
+            }
+        } else if (subCommand === 'nopermit') {
+            if (!targetUser) {
+                await sendMessage(sock, chatId, 'Please mention a user to remove permission.');
+                return;
+            }
+
+            const { error } = await supabase
+                .from(`${command}_permissions`)
+                .delete()
+                .eq('group_id', chatId)
+                .eq('user_id', targetUser);
+
+            if (error) {
+                console.error(`Error removing permission for user in ${command}:`, error);
+                await sendMessage(sock, chatId, `Failed to remove permission for user in ${command}.`);
+            } else {
+                await sendMessage(sock, chatId, `❌ User @${targetUser.split('@')[0]} is no longer permitted to bypass ${command}.`);
+            }
+        } else if (subCommand === 'permitnot') {
+            const { error } = await supabase
+                .from(`${command}_permissions`)
+                .delete()
+                .eq('group_id', chatId);
+
+            if (error) {
+                console.error(`Error clearing permissions for ${command}:`, error);
+                await sendMessage(sock, chatId, `Failed to clear permissions for ${command}.`);
+            } else {
+                await sendMessage(sock, chatId, `✅ All permissions for ${command} have been cleared.`);
+            }
+        } else {
+            await sendMessage(sock, chatId, 'Invalid subcommand. Use `permit`, `nopermit`, or `permitnot`.');
+        }
     }
 };
 
@@ -230,4 +311,4 @@ const deleteOldMessages = async () => {
 // Run every hour
 setInterval(deleteOldMessages, 60 * 60 * 1000);
 
-module.exports = { handleProtectionMessages, handleAntiDelete, initializeMessageCache, enableAntiDelete, disableAntiDelete };
+module.exports = { handleProtectionMessages, handleAntiDelete, initializeMessageCache, enableAntiDelete, disableAntiDelete, handleProtectionCommands };
