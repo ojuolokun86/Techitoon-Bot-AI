@@ -31,35 +31,31 @@ async function fetchGroupMetadataWithRetry(sock, groupId, retries = 3, delay = 2
     }
 }
 
-async function startMainBot(sock) {
+const startMainBot = async (sock) => {
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 New message upsert:', m);
         for (const msg of m.messages) {
-            // Always handle power commands
             await handlePowerCommand(sock, msg);
 
-            // If the bot is powered off, ignore all other commands
             if (!isBotOn()) {
                 console.log('🛑 Bot is powered off, ignoring all commands.');
                 continue;
             }
 
-            // Ignore bot's own messages
-            await processMessageWithRestrictedMode(sock, msg); // Use restrictedMode.js
+            await processMessageWithRestrictedMode(sock, msg);
         }
     });
 
     sock.ev.on('group-participants.update', async (update) => {
-        // If the bot is powered off, ignore all events
         if (!isBotOn()) {
             console.log('🛑 Bot is powered off, ignoring all events.');
             return;
         }
-        await handleGroupParticipantsUpdate(sock, update);
+        await handleGroupParticipantsUpdate(sock, update); // Pass sock correctly
     });
 
     console.log('✅ Main bot is ready and listening for messages.');
-}
+};
 
 const start = async () => {
     console.log('Starting bot...');
@@ -82,7 +78,7 @@ const start = async () => {
             logInfo('Techitoon Bot is ready!');
             startMainBot(sock);
             startSecurityBot(sock);
-        } else if (connection === 'connecting') {
+} else if (connection === 'connecting') {
             console.log('Connecting to WhatsApp...');
         } else if (connection === 'qr') {
             console.log('QR code received, please scan it with your WhatsApp app.');
