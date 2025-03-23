@@ -1,6 +1,7 @@
 const supabase = require('../supabaseClient');
 const { formatResponseWithHeaderFooter } = require('../utils/utils');
 const axios = require('axios');
+const axiosRetry = require('axios-retry');
 const https = require('https');
 const { enableAntiDelete, disableAntiDelete } = require('./protection'); // Import the enable and disable functions
 const config = require('../config/config'); // Import the config to get the bot owner ID
@@ -8,6 +9,9 @@ const { startBot } = require('../bot/bot');
 const { getPrefix } = require('../utils/configUtils'); // Import getPrefix function
 const { sendHelpMenu } = require('./helpMenu'); 
 const cron = require('node-cron');
+
+// Configure axios to use axios-retry
+
 
 const agent = new https.Agent({
     rejectUnauthorized: false
@@ -100,7 +104,7 @@ const updateUserStats = async (userId, groupId, statName) => {
 
 async function sendJoke(sock, chatId) {
     try {
-        const response = await axios.get('https://official-joke-api.appspot.com/random_joke');
+        const response = await axios.get('https://official-joke-api.appspot.com/random_joke', { httpsAgent: agent });
         const joke = `${response.data.setup}\n\n${response.data.punchline}`;
         await sock.sendMessage(chatId, { text: formatResponseWithHeaderFooter(joke) });
     } catch (error) {
@@ -111,7 +115,6 @@ async function sendJoke(sock, chatId) {
 
 const sendQuote = async (sock, chatId) => {
     try {
-        const agent = new https.Agent({ rejectUnauthorized: false }); 
         const response = await axios.get('https://api.quotable.io/random', { httpsAgent: agent });
         const quote = response.data.content;
         const author = response.data.author;

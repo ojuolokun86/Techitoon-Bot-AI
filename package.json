@@ -17,6 +17,7 @@
     "@vitalets/google-translate-api": "^9.2.1",
     "@whiskeysockets/baileys": "^6.7.16",
     "axios": "^1.8.4",
+    "axios-retry": "^4.5.0",
     "challonge": "^2.2.0",
     "cron": "^4.1.0",
     "dotenv": "^16.4.7",

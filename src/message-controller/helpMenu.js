@@ -75,7 +75,9 @@ const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
 ⚡ *${currentPrefix}poweron/poweroff* — Turn bot on/off  
 ⏱️ *${currentPrefix}uptime* — Check bot uptime  
 🔄 *${currentPrefix}restart* — Restart the bot  
-🛑 *${currentPrefix}stop* — Shutdown Techitoon Bot  
+🛑 *${currentPrefix}stop* — Shutdown Techitoon Bot
+📜 *${currentPrefix}logs* — View recent logs  
+📊 *${currentPrefix}status* — View bot status
 
 ╰━━━〘 🚀 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 - 𝙀𝙣𝙝𝙖𝙣𝙘𝙞𝙣𝙜 𝙔𝙤𝙪𝙧 𝘾𝙝𝙖𝙩𝙨! 🚀 〙━━━╯  
     `;
