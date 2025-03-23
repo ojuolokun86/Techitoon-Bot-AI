@@ -1,4 +1,5 @@
 const supabase = require('../supabaseClient');
+const { getVersion } = require('../version'); // Import the version
 
 // This file contains utility functions that assist with various tasks, such as formatting messages, logging errors, and managing user statistics.
 
@@ -21,6 +22,7 @@ function manageUserStats(userId, action) {
 }
 
 const formatResponseWithHeaderFooter = (message) => {
+    const version = getVersion(); // Get the current version
     return `
 🚀 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 𝘽𝙤𝙩 🚀
 
@@ -28,6 +30,7 @@ ${message}
 
 ━━━━━━━━━━━━━━━
   🤖 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 𝘼𝙄
+  🌟 Version: ${version}
 ━━━━━━━━━━━━━━━
 `;
 };
@@ -46,9 +49,14 @@ const welcomeMessage = async (groupName, user, chatId) => {
     const customMessage = data?.welcome_message;
 
     if (customMessage) {
-        return customMessage.replace('{user}', `@${user}`);
+        // Replace `{user}` with the user's mention
+        return {
+            text: customMessage.replace('{user}', `@${user.split('@')[0]}`),
+            mentions: [user], // Add the user to the mentions array
+        };
     } else {
-        return `🔥 Welcome to ${groupName}, @${user}! 🔥
+        // Default welcome message
+        const defaultMessage = `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
 
 🏆 This is where legends rise, champions battle, and history is made! ⚽💥 Get ready for intense competitions, thrilling matches, and unforgettable moments on the pitch.
 
@@ -58,6 +66,11 @@ const welcomeMessage = async (groupName, user, chatId) => {
 🔹 Stay active, stay competitive, and most importantly… HAVE FUN!
 
 👑 Welcome to the ${groupName}! Now, let’s make history! 🔥⚽`;
+
+        return {
+            text: defaultMessage,
+            mentions: [user], // Add the user to the mentions array
+        };
     }
 };
 

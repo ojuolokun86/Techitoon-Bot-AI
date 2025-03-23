@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./sync-version');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { logInfo, logError } = require('./utils/logger');
 const { handleGroupParticipantsUpdate } = require('./message-controller/messageHandler');

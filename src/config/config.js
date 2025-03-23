@@ -3,7 +3,6 @@ const { backupNumber } = require('../loadEnv');
 require('dotenv').config();
 
 const config = {
-    botVersion: 'v2.0.0', // Add this to track the version
     botOwnerId: process.env.ADMIN_NUMBER,
     adminNumber: process.env.ADMIN_NUMBER, // Ensure this is set in your .env file
     backupNumber: process.env.BACKUP_NUMBER, // Backup number for the bot

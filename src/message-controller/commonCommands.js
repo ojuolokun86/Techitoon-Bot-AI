@@ -189,7 +189,7 @@ const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
 📍 ${currentPrefix}weather <city> – Check the skies before you step out! ☁️🌦️
 📍 ${currentPrefix}translate <text> – Lost in translation? I’ll help! 🈶➡️🇬🇧
 
-👑 Admin Commands (Boss Mode Activated!)
+👑 Admin Commands (Boss Mode Activated!):
 🛠️ ${currentPrefix}admin – See who’s running the show! 🏆
 📊 ${currentPrefix}info – Get group details in one click! 🕵️‍♂️
 📜 ${currentPrefix}rules – Read the sacred laws of the group! 📖
@@ -201,19 +201,19 @@ const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
 📢 ${currentPrefix}announce <message> – Make a grand announcement! 📡 (Admin Only)
 🚫 ${currentPrefix}stopannounce – End announcement mode! ❌ (Admin Only)
 
-📅 Scheduling & Reminders:
-⏳ ${currentPrefix}schedule <message> – Set a future message! ⏰ (Admin Only)
-🔔 ${currentPrefix}remind <message> – Never forget important stuff! 📝 (Admin Only)
-❌ ${currentPrefix}cancelschedule – Abort mission! Stop scheduled messages! 🚀 (Admin Only)
-❌ ${currentPrefix}cancelreminder – Forget the reminder! 🚫 (Admin Only)
+🔗 Anti-Link Commands:
+🔗 ${currentPrefix}antilink on – Enable anti-link feature! 🔒 (Admin Only)
+🔗 ${currentPrefix}antilink off – Disable anti-link feature! 🔓 (Admin Only)
+🔗 ${currentPrefix}antilink permit @user – Allow a user to post links. ✅ (Admin Only)
+🔗 ${currentPrefix}antilink nopermit @user – Revoke a user's permission to post links. ❌ (Admin Only)
+🔗 ${currentPrefix}antilink permitnot – Remove all link permissions in the group. 🔄 (Admin Only)
 
-📊 Polls & Tournaments:
-📊 ${currentPrefix}poll <question> – Let democracy decide! 🗳️ (Admin Only)
-🗳️ ${currentPrefix}vote <option> – Cast your vote like a good citizen! ✅
-🏁 ${currentPrefix}endpoll – Wrap up the poll and declare the winner! 🎉 (Admin Only)
-⚽ ${currentPrefix}starttournament – Let the games begin! 🏆 (Admin Only)
-🏁 ${currentPrefix}endtournament – Close the tournament! 🏅 (Admin Only)
-📢 ${currentPrefix}tournamentstatus – Check who’s winning! 📊
+🛍️ Anti-Sales Commands:
+🛍️ ${currentPrefix}antisales on – Enable anti-sales feature! 🔒 (Admin Only)
+🛍️ ${currentPrefix}antisales off – Disable anti-sales feature! 🔓 (Admin Only)
+🛍️ ${currentPrefix}antisales permit @user – Allow a user to post sales content. ✅ (Admin Only)
+🛍️ ${currentPrefix}antisales nopermit @user – Revoke a user's permission to post sales content. ❌ (Admin Only)
+🛍️ ${currentPrefix}antisales permitnot – Remove all sales permissions in the group. 🔄 (Admin Only)
 
 ⚙️ Group & Bot Settings:
 📝 ${currentPrefix}setgrouprules <rules> – Set the laws of the land! 📜 (Admin Only)
@@ -234,14 +234,6 @@ const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
 🔒 Anti-Delete:
 🔓 ${currentPrefix}antidelete on – Enable anti-delete feature! 🔒 (Admin Only)
 🔓 ${currentPrefix}antidelete off – Disable anti-delete feature! 🔓 (Admin Only)
-
-🔗 Anti-Link:
-🔗 ${currentPrefix}antilink on – Enable anti-link feature! 🔒 (Admin Only)
-🔗 ${currentPrefix}antilink off – Disable anti-link feature! 🔓 (Admin Only)
-
-🛍️ Anti-Sales:
-🛍️ ${currentPrefix}antisales on – Enable anti-sales feature! 🔒 (Admin Only)
-🛍️ ${currentPrefix}antisales off – Disable anti-sales feature! 🔓 (Admin Only)
 
 🏆 Hall of Fame:
 📜 ${currentPrefix}fame – Show the Hall of Fame! 🏆
