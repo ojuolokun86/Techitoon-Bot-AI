@@ -2,7 +2,7 @@ const { exec } = require("child_process");
 const config = require("../config/config"); // Import the config file
 
 // Function to handle the undeploy command
-async function undeployBot(sock, chatId, sender, message) {
+async function undeployBot(sock, chatId, sender, message, currentPrefix) {
     // Get the bot owner's ID from the config file
     const BOT_OWNER_ID = config.botOwnerId;
 
