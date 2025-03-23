@@ -57,11 +57,15 @@ const welcomeMessage = async (sock, groupName, user, chatId) => {
 
     // Send the message with proper WhatsApp mention
     if (sock && typeof sock.sendMessage === 'function') {
-        await sock.sendMessage(chatId, {
-            text: formattedMessage,
-            mentions: [user], // Add the user to the mentions array
-        });
-        console.log(`👋 Sent welcome message to ${user}`);
+        try {
+            await sock.sendMessage(chatId, {
+                text: formattedMessage,
+                mentions: [user], // Add the user to the mentions array
+            });
+            console.log(`👋 Sent welcome message to ${user}`);
+        } catch (error) {
+            console.error('❌ Error sending welcome message:', error);
+        }
     } else {
         console.error('sock.sendMessage is not a function or sock is undefined.');
     }
