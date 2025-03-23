@@ -1,5 +1,7 @@
 const supabase = require('../supabaseClient');
 const { getVersion } = require('../version'); // Import the version
+const fonts = require('./fontStyles'); // Import font styles
+let selectedFont = "normal"; // Default font style
 
 // This file contains utility functions that assist with various tasks, such as formatting messages, logging errors, and managing user statistics.
 
@@ -22,17 +24,56 @@ function manageUserStats(userId, action) {
 }
 
 const formatResponseWithHeaderFooter = (message) => {
-    const version = getVersion(); // Get the current version
+    const version = getVersion(); // Update dynamically if needed
+    const now = new Date(); // Get current UTC time
+
+    // Convert UTC to your local timezone (e.g., Africa/Lagos)
+    const options = { 
+        timeZone: 'Africa/Lagos', 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit', 
+        hour12: true 
+    };
+ // Format date: "Sunday, Mar 23, 2025"
+ const date = now.toLocaleDateString('en-US', { 
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' 
+});
+
+// Format time: "07:56:18 PM"
+const time = now.toLocaleTimeString('en-US', { 
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
+});
+  
+    // Apply selected font
+    const formattedMessage = fonts[selectedFont] 
+    ? fonts[selectedFont](message) 
+    : message; // Fallback to normal if font is missing
+
+
     return `
-🚀 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 𝘽𝙤𝙩 🚀
+🚀 *Techitoon AI Assistant* 🚀
 
-${message}
+${formattedMessage}
+━━━━━━━━━━━━━━━━━━
+📅 *Dαƚҽ:* ${date}  
+🕒 *Ƭιɱҽ:* ${time}  
+🤖 *Vҽɾʂισɳ:* 𝖛${version}
+━━━━━━━━━━━━━━━━━━
+    `;
+};
 
-━━━━━━━━━━━━━━━
-  🤖 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 𝘼𝙄
-  🌟 Version: ${version}
-━━━━━━━━━━━━━━━
-`;
+const setFontStyle = (fontName) => {
+    if (fonts[fontName]) {
+        selectedFont = fontName;
+        return `✅ Font changed to *${fontName}* successfully!`;
+    } else {
+        return `❌ Font *${fontName}* not found! Use *listfonts* to see available fonts.`;
+    }
 };
 
 const welcomeMessage = async (sock, groupName, user, chatId) => {
@@ -41,8 +82,28 @@ const welcomeMessage = async (sock, groupName, user, chatId) => {
     console.log('🔍 Type of sock:', typeof sock);
     console.log('🔍 Type of sock.sendMessage:', typeof sock.sendMessage);
 
-    // Predefined or default welcome message
-    const welcomeText = `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
+    // Fetch custom welcome message from Supabase
+    let customMessage = null;
+    try {
+        const { data, error } = await supabase
+            .from('group_settings')
+            .select('welcome_message')
+            .eq('group_id', chatId)
+            .single();
+
+        if (error) {
+            console.error('❌ Error fetching custom welcome message from Supabase:', error);
+        } else {
+            customMessage = data?.welcome_message;
+        }
+    } catch (error) {
+        console.error('❌ Error querying Supabase for custom welcome message:', error);
+    }
+
+    // Use custom message if available, otherwise fallback to default
+    const welcomeText = customMessage
+        ? customMessage.replace('{user}', `@${user.split('@')[0]}`).replace('{group}', groupName)
+        : `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
 
 🏆 This is where legends rise, champions battle, and history is made! ⚽💥 Get ready for intense competitions, thrilling matches, and unforgettable moments on the pitch.
 
@@ -163,4 +224,5 @@ module.exports = {
     showGroupStats,
     warnUser,
     isWelcomeMessageEnabled,
+    setFontStyle,
 };

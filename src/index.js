@@ -2,112 +2,61 @@ require('dotenv').config();
 require('./sync-version');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { logInfo, logError } = require('./utils/logger');
-const { handleGroupParticipantsUpdate } = require('./message-controller/messageHandler');
-const { startSecurityBot } = require('./security');
-const { processMessageWithRestrictedMode } = require('./bot/restrictedMode'); // Import restrictedMode.js
-const config = require('./config/config');
-const supabase = require('./supabaseClient');
-const { handlePowerCommand, isBotOn } = require('./bot/botPower');
-const { addUser, getUsers, removeUser } = require('./userManager');
-const { startUserBot } = require('./bot/bot');
+const { startMainBot, startSecurityBot } = require('./bot/bot'); // Import startMainBot and startSecurityBot from bot.js
 
-async function saveSuperadmin(groupId, userId) {
-    await supabase
-        .from('superadmins')
-        .upsert([{ group_id: groupId, user_id: userId }]);
-}
+const startBot = async () => {
+    try {
+        console.log('🚀 Starting Techitoon Bot...');
+        
+        console.log('🔄 Fetching authentication state...');
+        const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+        console.log('✅ Authentication state fetched.');
 
-async function fetchGroupMetadataWithRetry(sock, groupId, retries = 3, delay = 2000) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            return await sock.groupMetadata(groupId);
-        } catch (err) {
-            if (i === retries - 1) {
-                throw err;
+        console.log('🔄 Creating WhatsApp socket...');
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: true,
+        });
+        console.log('✅ WhatsApp socket created.');
+
+        // Start the main bot
+        console.log('🔄 Starting main bot...');
+        await startMainBot(sock);
+        console.log('✅ Main bot started.');
+
+        // Start the security bot
+        console.log('🔄 Starting security bot...');
+        await startSecurityBot(sock);
+        console.log('✅ Security bot started.');
+
+        // Handle connection updates
+        sock.ev.on('connection.update', (update) => {
+            console.log('🔄 Connection update received:', update);
+            const { connection, lastDisconnect } = update;
+
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                logError(`Connection closed due to ${lastDisconnect.error}, reconnecting ${shouldReconnect}`);
+                if (shouldReconnect) {
+                    startBot();
+                }
+            } else if (connection === 'open') {
+                logInfo('✅ Techitoon Bot is ready!');
+            } else if (connection === 'connecting') {
+                console.log('🔄 Connecting to WhatsApp...');
+            } else if (connection === 'qr') {
+                console.log('📱 QR code received, please scan it.');
             }
-            console.log(`Retrying fetchGroupMetadata (${i + 1}/${retries})...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+        console.log('✅ Credentials update handler set.');
+
+        console.log('🎉 Techitoon Bot is fully started!');
+    } catch (error) {
+        console.error('❌ Fatal error in startBot():', error);
     }
-}
-
-const startMainBot = async (sock) => {
-    sock.ev.on('messages.upsert', async (m) => {
-        console.log('📩 New message upsert:', m);
-        for (const msg of m.messages) {
-            await handlePowerCommand(sock, msg);
-
-            if (!isBotOn()) {
-                console.log('🛑 Bot is powered off, ignoring all commands.');
-                continue;
-            }
-
-            await processMessageWithRestrictedMode(sock, msg);
-        }
-    });
-
-    sock.ev.on('group-participants.update', async (update) => {
-        if (!isBotOn()) {
-            console.log('🛑 Bot is powered off, ignoring all events.');
-            return;
-        }
-        await handleGroupParticipantsUpdate(sock, update); // Pass sock correctly
-    });
-
-    console.log('✅ Main bot is ready and listening for messages.');
 };
 
-const start = async () => {
-    console.log('Starting bot...');
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true,
-    });
+startBot();
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
-        console.log('Connection update:', update);
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            logError(`Connection closed due to ${lastDisconnect.error}, reconnecting ${shouldReconnect}`);
-            if (shouldReconnect) {
-                start();
-            }
-        } else if (connection === 'open') {
-            logInfo('Techitoon Bot is ready!');
-            startMainBot(sock);
-            startSecurityBot(sock);
-} else if (connection === 'connecting') {
-            console.log('Connecting to WhatsApp...');
-        } else if (connection === 'qr') {
-            console.log('QR code received, please scan it with your WhatsApp app.');
-        }
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-};
-
-start().catch(error => {
-    logError(`❌ Error starting bot: ${error}`);
-});
-
-//bot.on('message', async (msg) => {
-   // const sender = msg.sender;
-   // const message = msg.body.trim();
-    //const args = message.split(' ');
-
-    //if (message.startsWith('.adduser')) {
-      //  if (!args[1]) return bot.sendMessage(sender, "Usage: .adduser <user_number>");
-        //const response = await addUser(args[1]);
-       // bot.sendMessage(sender, response);
-       // startUserBot(args[1]); // Start the bot for the new user
-    //} else if (message === '.users') {
-      //  const users = await getUsers();
-       // bot.sendMessage(sender, `Registered Users:\n${users.join('\n')}`);
-    //} else if (message.startsWith('.removeuser')) {
-        //if (!args[1]) return bot.sendMessage(sender, "Usage: .removeuser <user_number>");
-      //  const response = await removeUser(args[1]);
-    //    bot.sendMessage(sender, response);
-  //  }
-//});
