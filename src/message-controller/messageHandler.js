@@ -18,6 +18,7 @@ const { handleNewImage, startTournament, showTopScorers, showLeaderboard, addGoa
 const { showHallOfFame, addWinner } = require('./hallOfFame');
 const { getPrefix, setPrefix } = require('../utils/configUtils');
 const { showAllGroupStats } = require('./commonCommands');
+const { undeployBot } = require('../commands/undeployCommand'); // Import the undeploy command
 
 
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
@@ -109,6 +110,11 @@ const handleCommand = async (sock, msg) => {
         }
     }  
 
+
+    // Handle the undeploy command
+if (messageText === `${currentPrefix}undeploy` || messageText === `${currentPrefix}confirm`) {
+    await undeployBot(sock, chatId, sender, messageText);
+}
      
      
     
@@ -685,9 +691,16 @@ const checkIfAdmin = async (sock, chatId, userId, retries = 3, delay = 2000) => 
 const handleGroupParticipantsUpdate = async (sock, update) => {
     try {
         console.log('👥 Group participants update:', update);
+        console.log('🔍 Full sock object in handleGroupParticipantsUpdate:', sock);
+        console.log('🔍 Type of sock:', typeof sock);
+        console.log('🔍 Type of sock.sendMessage:', typeof sock.sendMessage);
+
         const chat = await sock.groupMetadata(update.id);
         const contact = update.participants[0];
         const user = contact.split('@')[0];
+
+
+        // Fetch group settings
         const { data: groupSettings, error } = await supabase
             .from('group_settings')
             .select('welcome_messages_enabled, goodbye_messages_enabled')
@@ -699,11 +712,14 @@ const handleGroupParticipantsUpdate = async (sock, update) => {
             return;
         }
 
-        if (update.action === 'add' && groupSettings && groupSettings.welcome_messages_enabled) {
-            const welcomeMsg = await welcomeMessage(chat.subject, user, update.id);
-            await sock.sendMessage(chat.id, { text: formatResponseWithHeaderFooter(welcomeMsg), mentions: [contact] });
-            console.log(`👋 Sent welcome message to ${user}`);
+          // Handle welcome messages
+          if (update.action === 'add' && groupSettings && groupSettings.welcome_messages_enabled) {
+            console.log('➡️ Adding participant:', user);
+            console.log('🔍 Calling welcomeMessage with sock:', sock);
+            await welcomeMessage(sock, chat.subject, contact, update.id);
         }
+
+
 
         if ((update.action === 'remove' || update.action === 'leave') && groupSettings && groupSettings.goodbye_messages_enabled) {
             let goodbyeMessage;
