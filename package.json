@@ -1,5 +1,5 @@
 {
-  "name": "new-bot",
+  "name": "techitoon_bot",
   "version": "2.5.0",
   "description": "",
   "license": "ISC",
@@ -25,7 +25,8 @@
     "node-fetch": "^3.3.2",
     "path": "^0.12.7",
     "qrcode-terminal": "^0.12.0",
-    "tesseract.js": "^6.0.0"
+    "tesseract.js": "^6.0.0",
+    "winston": "^3.17.0"
   },
   "engines": {
     "node": ">=14.0.0"

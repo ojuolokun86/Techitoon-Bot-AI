@@ -41,8 +41,28 @@ const welcomeMessage = async (sock, groupName, user, chatId) => {
     console.log('🔍 Type of sock:', typeof sock);
     console.log('🔍 Type of sock.sendMessage:', typeof sock.sendMessage);
 
-    // Predefined or default welcome message
-    const welcomeText = `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
+    // Fetch custom welcome message from Supabase
+    let customMessage = null;
+    try {
+        const { data, error } = await supabase
+            .from('group_settings')
+            .select('welcome_message')
+            .eq('group_id', chatId)
+            .single();
+
+        if (error) {
+            console.error('❌ Error fetching custom welcome message from Supabase:', error);
+        } else {
+            customMessage = data?.welcome_message;
+        }
+    } catch (error) {
+        console.error('❌ Error querying Supabase for custom welcome message:', error);
+    }
+
+    // Use custom message if available, otherwise fallback to default
+    const welcomeText = customMessage
+        ? customMessage.replace('{user}', `@${user.split('@')[0]}`).replace('{group}', groupName)
+        : `🔥 Welcome to ${groupName}, @${user.split('@')[0]}! 🔥
 
 🏆 This is where legends rise, champions battle, and history is made! ⚽💥 Get ready for intense competitions, thrilling matches, and unforgettable moments on the pitch.
 

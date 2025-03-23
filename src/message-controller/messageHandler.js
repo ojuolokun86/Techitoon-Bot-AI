@@ -1,4 +1,5 @@
 const { sendMessage, sendReaction } = require('../utils/messageUtils');
+const commandEmojis = require('../utils/commandEmojis');
 const supabase = require('../supabaseClient');
 const { issueWarning, resetWarnings, listWarnings } = require('../message-controller/warning');
 const config = require('../config/config');
@@ -69,11 +70,25 @@ const handleCommand = async (sock, msg) => {
     const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
 
 
+   
+    
     // Get the current prefix
     const currentPrefix = await getPrefix();
+    console.log(`🔍 Current Prefix: ${currentPrefix}`);
 
+    console.log(`📩 Received message: ${messageText}`);
+    console.log(`📩 From sender: ${sender}`);
+    console.log(`📩 In chatId: ${chatId}`);
+    console.log(`✅ Message starts with prefix: ${messageText.startsWith(currentPrefix)}`);
+
+
+
+    
     // Ensure the message starts with the prefix
-    if (!messageText.startsWith(currentPrefix)) return;
+    if (!messageText.startsWith(currentPrefix)) {
+        console.log('Message does not start with the current prefix.');
+        return;
+    }
 
     // Handle change prefix command
     if (messageText.startsWith(`${currentPrefix}prefix`)) {
@@ -122,6 +137,7 @@ if (messageText === `${currentPrefix}undeploy` || messageText === `${currentPref
     if (messageText.startsWith(`${currentPrefix}setwelcome`)) {
         const args = messageText.split(' ').slice(1);
         const newWelcomeMessage = args.join(' ');
+        console.log('Processing setwelcome command:', newWelcomeMessage);
 
         if (!newWelcomeMessage) {
             await sendMessage(sock, chatId, '⚠️ Please provide a new welcome message.');
@@ -141,7 +157,19 @@ if (messageText === `${currentPrefix}undeploy` || messageText === `${currentPref
      // Extract the command and arguments
      const args = messageText.slice(currentPrefix.length).trim().split(/ +/);
      const command = args.shift()?.toLowerCase();
- 
+
+     console.log(`🛠 Extracted Command: ${command}`);
+     console.log(`🛠 Arguments: ${args}`);
+     console.log(`🔍 Extracted Command: ${command}`);
+
+     const emoji = commandEmojis[command] || '👍'; // Default to thumbs up if command not found
+     console.log(`🔍 Emoji for Command "${command}": ${emoji}`);
+
+
+     
+    // Call sendReaction to send a reaction for the command
+    console.log(`✅ Sending Reaction for Command: ${command}`);
+    await sendReaction(sock, chatId, msg.key.id, messageText);
 
    // Handle `antilink on/off` and `antisales on/off` commands
    if (command === 'antilink' || command === 'antisales') {
@@ -604,7 +632,8 @@ const handleIncomingMessages = async (sock, m) => {
         console.log(`🛠 Extracted Command: ${command}`);
 
         // React to the command
-        await sendReaction(sock, chatId, message.key.id, command);
+        console.log(`✅ Calling sendReaction with messageText: ${msgText}`);
+        await sendReaction(sock, chatId, message.key.id, msgText);
 
         // Handle the command
         await handleCommand(sock, message);
