@@ -5,8 +5,9 @@ const commandEmojis = {
     quote: '💬',
     weather: '☀️',
     translate: '🌐',
+    setfont: '🖋️',
+    listfonts: '📜',
     admin: '👮',
-    info: 'ℹ️',
     rules: '📏',
     clear: '🧹',
     ban: '👢',
@@ -17,20 +18,29 @@ const commandEmojis = {
     stopannounce: '🔕',
     schedule: '📅',
     remind: '⏰',
+    listschedule: '📅',
     cancelschedule: '❌',
     cancelreminder: '❌',
     poll: '📊',
     vote: '🗳️',
     endpoll: '🏁',
     starttournament: '🏆',
-    addteam: '👥',
-    register: '📝',
-    endtournament: '🏁',
-    tournamentstatus: '📊',
+    startbestattack: '🏆',
+    bestattack: '⚔️',
+    endbestattack: '🏁',
+    extract: '📊',
+    goal: '⚽',
+    setgoal: '⚽',
+    topscorers: '🏅',
+    addplayer: '➕',
+    removeplayer: '➖',
+    listplayers: '📋',
+    uploadresult: '📤',
+    autocheckresult: '🔄',
+    autocheckresultoff: '🔄',
     setgrouprules: '📏',
     settournamentrules: '📏',
     setlanguage: '🌐',
-    showstats: '📊',
     delete: '🗑️',
     enable: '✅',
     disable: '❌',
@@ -41,29 +51,34 @@ const commandEmojis = {
     warn: '⚠️',
     listwarn: '📋',
     resetwarn: '🔄',
-    addcommand: '➕',
-    deletecommand: '➖',
-    antideleteon: '🔒',
-    antideleteoff: '🔓',
-    addwinner: '🏆',
     fame: '🌟',
-    restrictbot: '🔒', // Added for restricted mode
-    unrestrictbot: '🔓', // Added for unrestricted mode
-    poweron: '⚡', // Added for bot power on
-    poweroff: '🔌', // Added for bot power off
-    undeploy: '🚀', // Added for undeploy command
-    confirm: '✅', // Added for confirmation
-    help: '❓', // Added for help menu
-    start: '▶️', // Added for starting a process
-    stop: '⏹️', // Added for stopping a process
-    restart: '🔄', // Added for restarting
-    backup: '💾', // Added for backup commands
-    restore: '♻️', // Added for restore commands
-    uptime: '⏱️', // Added for uptime check
-    logs: '📜', // Added for viewing logs
-    status: '📊', // Added for bot or group status
-    greet: '👋', // Added for greeting commands
-    goodbye: '👋', // Added for farewell commands
+    sharelink: '🔗',
+    addwinner: '🏆',
+    startgoodbye: '👋',
+    stopgoodbye: '🚫',
+    restriction: '🔒',
+    antilink: '🔗',
+    antisales: '🚫',
+    antidelete: '❌',
+    permit: '✅',
+    nopermit: '❌',
+    permitadmin: '👮',
+    permitnot: '🚫',
+    poweron: '⚡',
+    poweroff: '🔌',
+    uptime: '⏱️',
+    restart: '🔄',
+    stop: '⏹️',
+    logs: '📜',
+    status: '📊',
+    undeploy: '🚀',
+    confirm: '✅',
+    help: '❓',
+    start: '▶️',
+    backup: '💾',
+    restore: '♻️',
+    greet: '👋',
+    goodbye: '👋',
 };
 
 module.exports = commandEmojis;
