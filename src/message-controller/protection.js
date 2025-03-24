@@ -3,6 +3,7 @@ const supabase = require('../supabaseClient');
 const { issueWarning, getRemainingWarnings } = require('../message-controller/warning');
 const config = require('../config/config');
 const { getPrefix } = require('../utils/configUtils');
+const { enableAntiDelete, disableAntiDelete } = require('./antiDelete');
 
 const salesKeywords = [
     'sell', 'sale', 'selling', 'buy', 'buying', 'trade', 'trading', 'swap', 'swapping', 'exchange', 'price',
@@ -45,7 +46,7 @@ const handleProtectionMessages = async (sock, message) => {
     if (chatId.endsWith('@g.us') || chatId.endsWith('@broadcast')) {
         const { data, error } = await supabase
             .from('group_settings')
-            .select('bot_enabled, antilink_enabled, antisales_enabled')
+            .select('bot_enabled, antilink_enabled, antisales_enabled, permit_admin_bypass')
             .eq('group_id', chatId)
             .single();
         groupSettings = data;
@@ -80,8 +81,12 @@ const handleProtectionMessages = async (sock, message) => {
 
         const isPermitted = permittedUsers?.some(user => user.user_id === sender);
 
-        if (isPermitted) {
-            console.log(`User ${sender} is permitted to bypass protection.`);
+        // Check if the sender is an admin and if admin bypass is enabled
+        const groupMetadata = await getGroupMetadata(sock, chatId);
+        const isAdmin = groupMetadata?.participants.some(participant => participant.id === sender && (participant.admin === 'admin' || participant.admin === 'superadmin'));
+
+        // Bypass protection for the bot owner
+        if (sender === config.botOwnerId || isPermitted || (isAdmin && groupSettings.permit_admin_bypass)) {
             return;
         }
 
@@ -126,117 +131,4 @@ const handleProtectionMessages = async (sock, message) => {
     }
 };
 
-let antiDeleteGroups = new Set(); // Store groups with anti-delete enabled
-
-const enableAntiDelete = async (chatId) => {
-    const { error } = await supabase.from('anti_delete_groups').insert([{ chat_id: chatId }]);
-    if (error) {
-        console.error("Failed to enable anti-delete:", error);
-    } else {
-        antiDeleteGroups.add(chatId);
-    }
-};
-
-const disableAntiDelete = async (chatId) => {
-    const { error } = await supabase.from('anti_delete_groups').delete().eq('chat_id', chatId);
-    if (error) {
-        console.error("Failed to disable anti-delete:", error);
-    } else {
-        antiDeleteGroups.delete(chatId);
-    }
-};
-
-const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) => {
-    const { error } = await supabase
-        .from('anti_delete_messages')
-        .insert([
-            { chat_id: chatId, message_id: messageId, sender: sender, message_content: messageContent }
-        ]);
-
-    if (error) {
-        console.error('Error saving message to database:', error);
-    }
-};
-
-const handleAntiDelete = async (sock, message, botNumber) => {
-    const chatId = message.key.remoteJid;
-    const sender = message.key.participant || message.key.remoteJid;
-
-    if (message.messageStubType === 'message_revoke_for_everyone' && sender !== botNumber) {
-        const deletedMessageKey = message.messageProtocolContextInfo?.stanzaId;
-        if (!deletedMessageKey) {
-            console.log("No stanzaId found");
-            return;
-        }
-
-        console.log(`🛑 Message deleted in ${chatId} by ${sender}`);
-
-        // Fetch deleted message from database
-        const { data, error } = await supabase
-            .from('anti_delete_messages')
-            .select('*')
-            .eq('chat_id', chatId)
-            .eq('message_id', deletedMessageKey)
-            .single();
-
-        if (error || !data) {
-            console.log("⚠️ Message not found in database. Cannot restore.");
-            return;
-        }
-
-        console.log(`✅ Restoring message from database:`, data);
-
-        await sock.sendMessage(chatId, {
-            text: `🔄 *Restored Message from @${sender.split('@')[0]}:*\n${data.message_content}`,
-            mentions: [sender]
-        });
-    }
-};
-
-// Store messages before deletion
-function initializeMessageCache(sock) {
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        for (const msg of messages) {
-            const chatId = msg.key.remoteJid;
-            const sender = msg.key.participant || chatId;
-            const messageId = msg.key.id;
-
-            if (!msg.message) return;  // Ignore empty messages
-
-            const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-            if (!messageText) return; // Ignore unsupported message types
-
-            // Check if anti-delete is enabled in the group
-            const { data, error } = await supabase
-                .from('anti_delete_groups')
-                .select('chat_id')
-                .eq('chat_id', chatId)
-                .single();
-
-            if (error && error.code !== "PGRST116") return; // Ignore missing row error
-
-            // Store messages if (1) it's a private chat or (2) anti-delete is enabled in the group
-            if (chatId.includes("@g.us") && !data) return; // Skip if not enabled in group
-
-            await saveMessageToDatabase(chatId, messageId, sender, messageText);
-        }
-    });
-}
-
-// Auto-delete old messages from the database
-const deleteOldMessages = async () => {
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-
-    const { error } = await supabase
-        .from('anti_delete_messages')
-        .delete()
-        .lt('timestamp', threeDaysAgo.toISOString());
-
-    if (error) console.error("Failed to delete old messages:", error);
-};
-
-// Run every hour
-setInterval(deleteOldMessages, 60 * 60 * 1000);
-
-module.exports = { handleProtectionMessages, handleAntiDelete, initializeMessageCache, enableAntiDelete, disableAntiDelete };
+module.exports = { handleProtectionMessages };

@@ -824,3 +824,23 @@ TypeError: axiosRetry is not a function
     at Module.require (node:internal/modules/cjs/loader:1335:12)
     at require (node:internal/modules/helpers:136:16)
     at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:7:24)
+[2025-03-24T06:11:38.137Z] ERROR: uncaughtException: Cannot find module '../utils/formatResponse'
+Require stack:
+- C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js
+- C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\bot\bot.js
+- C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\index.js
+Error: Cannot find module '../utils/formatResponse'
+Require stack:
+- C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js
+- C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\bot\bot.js
+- C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\index.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1244:15)
+    at Function._load (node:internal/modules/cjs/loader:1070:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:23:26)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)

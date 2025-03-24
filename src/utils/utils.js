@@ -68,12 +68,13 @@ ${formattedMessage}
 };
 
 const setFontStyle = (fontName) => {
-    if (fonts[fontName]) {
-        selectedFont = fontName;
-        return `✅ Font changed to *${fontName}* successfully!`;
-    } else {
-        return `❌ Font *${fontName}* not found! Use *listfonts* to see available fonts.`;
+    const availableFonts = ['normal', 'bold', 'italic', 'script'];
+    if (!availableFonts.includes(fontName)) {
+        return `⚠️ Invalid font style. Available fonts are: ${availableFonts.join(', ')}`;
     }
+
+    selectedFont = fontName; // Update the selected font style
+    return `✅ Font style set to: ${fontName}`;
 };
 
 const welcomeMessage = async (sock, groupName, user, chatId) => {

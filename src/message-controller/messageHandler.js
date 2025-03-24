@@ -3,14 +3,14 @@ const commandEmojis = require('../utils/commandEmojis');
 const supabase = require('../supabaseClient');
 const { issueWarning, resetWarnings, listWarnings } = require('../message-controller/warning');
 const config = require('../config/config');
-const { updateUserStats } = require('../utils/utils');
+const { updateUserStats, setFontStyle } = require('../utils/utils'); // Import setFontStyle
 const commonCommands = require('../message-controller/commonCommands');
 const adminCommands = require('../message-controller/adminActions');
 const botCommands = require('../message-controller/botCommands');
 const scheduleCommands = require('../message-controller/scheduleMessage');
 const pollCommands = require('../message-controller/polls');
 const tournamentCommands = require('../message-controller/tournament');
-const { handleProtectionMessages, handleAntiDelete, enableAntiDelete, disableAntiDelete, handleProtectionCommands } = require('../message-controller/protection');
+const { handleProtectionMessages, handleAntiDelete, enableAntiDelete, disableAntiDelete } = require('../message-controller/protection');
 const { exec } = require("child_process");
 const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage, setWelcomeMessage } = require('../utils/utils');
@@ -20,7 +20,7 @@ const { showHallOfFame, addWinner } = require('./hallOfFame');
 const { getPrefix, setPrefix } = require('../utils/configUtils');
 const { showAllGroupStats, scheduleQuote, stopScheduledQuotes, sendQuote } = require('./commonCommands');
 const { undeployBot } = require('../commands/undeployCommand'); // Import the undeploy command
-//const { setFontStyle } = require('../utils/formatResponse');
+const { toggleAntiDelete } = require('./antiDeleteCommands'); // Import the toggleAntiDelete function
 
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
 
@@ -44,7 +44,6 @@ const isAdminOrOwner = async (sock, chatId, sender) => {
 };
 
 const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) => {
-    console.log(`Saving message to database: chatId=${chatId}, messageId=${messageId}, sender=${sender}, messageContent=${messageContent}`);
     const { error } = await supabase
         .from('messages')
         .insert([
@@ -64,6 +63,54 @@ const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) 
     }
 };
 
+const enableAntiLink = async (chatId, permitAdmin) => {
+    const { error } = await supabase
+        .from('group_settings')
+        .update({ antilink_enabled: true, permit_admin_bypass: permitAdmin })
+        .eq('group_id', chatId);
+
+    if (error) {
+        console.error('Error enabling anti-link:', error);
+        throw new Error('Error enabling anti-link');
+    }
+};
+
+const disableAntiLink = async (chatId) => {
+    const { error } = await supabase
+        .from('group_settings')
+        .update({ antilink_enabled: false })
+        .eq('group_id', chatId);
+
+    if (error) {
+        console.error('Error disabling anti-link:', error);
+        throw new Error('Error disabling anti-link');
+    }
+};
+
+const enableAntiSales = async (chatId, permitAdmin) => {
+    const { error } = await supabase
+        .from('group_settings')
+        .update({ antisales_enabled: true, permit_admin_bypass: permitAdmin })
+        .eq('group_id', chatId);
+
+    if (error) {
+        console.error('Error enabling anti-sales:', error);
+        throw new Error('Error enabling anti-sales');
+    }
+};
+
+const disableAntiSales = async (chatId) => {
+    const { error } = await supabase
+        .from('group_settings')
+        .update({ antisales_enabled: false })
+        .eq('group_id', chatId);
+
+    if (error) {
+        console.error('Error disabling anti-sales:', error);
+        throw new Error('Error disabling anti-sales');
+    }
+};
+
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
@@ -77,6 +124,12 @@ const handleCommand = async (sock, msg) => {
     console.log(`📩 From sender: ${sender}`);
     console.log(`📩 In chatId: ${chatId}`);
     console.log(`✅ Message starts with prefix: ${messageText.startsWith(currentPrefix)}`);
+
+    // Ensure the message starts with the prefix
+    if (!messageText.startsWith(currentPrefix)) {
+        console.log('Message does not start with the current prefix.');
+        return;
+    }
 
     // Ensure the message starts with the prefix
     if (!messageText.startsWith(currentPrefix)) {
@@ -181,149 +234,171 @@ const handleCommand = async (sock, msg) => {
         return;
     }
 
-    if (command === 'listbots') {
-        console.log('Handling listbots command...');
-        await commonCommands.listBotsInGroup(sock, chatId);
-        return;
-    }
-
-    // Handle `antilink on/off` and `antisales on/off` commands
-    if (command === 'antilink' || command === 'antisales') {
-        const subCommand = args.shift()?.toLowerCase();
-
-        // Handle `on` and `off` commands
-        if (subCommand === 'on') {
-            const { error } = await supabase
-                .from('group_settings')
-                .update({ [`${command}_enabled`]: true })
-                .eq('group_id', chatId);
-
-            if (error) {
-                console.error(`Error enabling ${command}:`, error);
-                await sendMessage(sock, chatId, `⚠️ Error enabling ${command}. Please try again later.`);
-            } else {
-                await sendMessage(sock, chatId, `✅ ${command.charAt(0).toUpperCase() + command.slice(1)} has been enabled for this group.`);
-            }
-            return;
-        } else if (subCommand === 'off') {
-            const { error } = await supabase
-                .from('group_settings')
-                .update({ [`${command}_enabled`]: false })
-                .eq('group_id', chatId);
-
-            if (error) {
-                console.error(`Error disabling ${command}:`, error);
-                await sendMessage(sock, chatId, `⚠️ Error disabling ${command}. Please try again later.`);
-            } else {
-                await sendMessage(sock, chatId, `❌ ${command.charAt(0).toUpperCase() + command.slice(1)} has been disabled for this group.`);
-            }
+    if (command === 'antilink') {
+        if (sender !== config.botOwnerId) {
+            await sendMessage(sock, chatId, '❌ Only bot owner can use this command.');
             return;
         }
 
-        // Handle subcommands: `permit`, `nopermit`, `permitnot`
-        if (subCommand === 'permit') {
-            const targetUser = args[0]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        const action = args[0];
+        const permitAdmin = args[1] === 'permitadmin';
+
+        if (action === 'on') {
+            // Enable antilink
+            await enableAntiLink(chatId, permitAdmin);
+            await sendMessage(sock, chatId, `✅ Antilink has been enabled${permitAdmin ? ' with admin bypass' : ''}.`);
+        } else if (action === 'off') {
+            // Disable antilink
+            await disableAntiLink(chatId);
+            await sendMessage(sock, chatId, '✅ Antilink has been disabled.');
+        } else if (action === 'permit') {
+            const targetUser = args[1]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
             if (!targetUser) {
                 await sendMessage(sock, chatId, '⚠️ Please mention a user to permit.');
                 return;
             }
 
             const { error } = await supabase
-                .from(`${command}_permissions`)
+                .from('antilink_permissions')
                 .insert([{ group_id: chatId, user_id: targetUser }]);
 
             if (error) {
-                console.error(`Error permitting user for ${command}:`, error);
-                await sendMessage(sock, chatId, `⚠️ Failed to permit user for ${command}.`);
+                console.error(`Error permitting user for antilink:`, error);
+                await sendMessage(sock, chatId, `⚠️ Failed to permit user for antilink.`);
             } else {
-                await sendMessage(sock, chatId, `✅ User @${targetUser.split('@')[0]} is now permitted to bypass ${command}.`, [targetUser]);
+                await sendMessage(sock, chatId, `✅ User @${targetUser.split('@')[0]} is now permitted to bypass antilink.`, [targetUser]);
             }
-        } else if (subCommand === 'nopermit') {
-            const targetUser = args[0]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        } else if (action === 'nopermit') {
+            const targetUser = args[1]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
             if (!targetUser) {
                 await sendMessage(sock, chatId, '⚠️ Please mention a user to revoke permission.');
                 return;
             }
 
             const { error } = await supabase
-                .from(`${command}_permissions`)
+                .from('antilink_permissions')
                 .delete()
                 .eq('group_id', chatId)
                 .eq('user_id', targetUser);
 
             if (error) {
-                console.error(`Error revoking permission for user in ${command}:`, error);
-                await sendMessage(sock, chatId, `⚠️ Failed to revoke permission for user in ${command}.`);
+                console.error(`Error revoking permission for user in antilink:`, error);
+                await sendMessage(sock, chatId, `⚠️ Failed to revoke permission for user in antilink.`);
             } else {
-                await sendMessage(sock, chatId, `❌ User @${targetUser.split('@')[0]} is no longer permitted to bypass ${command}.`, [targetUser]);
+                await sendMessage(sock, chatId, `❌ User @${targetUser.split('@')[0]} is no longer permitted to bypass antilink.`, [targetUser]);
             }
-        } else if (subCommand === 'permitnot') {
+        } else if (action === 'permitnot') {
             const { error } = await supabase
-                .from(`${command}_permissions`)
+                .from('antilink_permissions')
                 .delete()
                 .eq('group_id', chatId);
 
             if (error) {
-                console.error(`Error clearing permissions for ${command}:`, error);
-                await sendMessage(sock, chatId, `⚠️ Failed to clear permissions for ${command}.`);
+                console.error(`Error clearing permissions for antilink:`, error);
+                await sendMessage(sock, chatId, `⚠️ Failed to clear permissions for antilink.`);
             } else {
-                await sendMessage(sock, chatId, `✅ All permissions for ${command} have been cleared.`);
+                await sendMessage(sock, chatId, `✅ All permissions for antilink have been cleared.`);
             }
         } else {
-            await sendMessage(sock, chatId, '⚠️ Invalid subcommand. Use `on`, `off`, `permit`, `nopermit`, or `permitnot`.');
+            await sendMessage(sock, chatId, '⚠️ Invalid action. Use "on", "off", "permit", "nopermit", or "permitnot".');
         }
         return;
     }
 
-    // Handle `antilink on/off` and `antisales on/off`
-    if (messageText.startsWith(`${currentPrefix}antilink on`)) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antilink_enabled: true })
-            .eq('group_id', chatId);
-
-        if (error) {
-            console.error('Error enabling anti-link:', error);
-            await sendMessage(sock, chatId, '⚠️ Error enabling anti-link. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '✅ Anti-link has been enabled for this group.');
+    if (command === 'antisales') {
+        if (sender !== config.botOwnerId) {
+            await sendMessage(sock, chatId, '❌Only bot owner can use this command.');
+            return;
         }
-    } else if (messageText.startsWith(`${currentPrefix}antilink off`)) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antilink_enabled: false })
-            .eq('group_id', chatId);
 
-        if (error) {
-            console.error('Error disabling anti-link:', error);
-            await sendMessage(sock, chatId, '⚠️ Error disabling anti-link. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '❌ Anti-link has been disabled for this group.');
-        }
-    } else if (messageText.startsWith(`${currentPrefix}antisales on`)) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antisales_enabled: true })
-            .eq('group_id', chatId);
+        const action = args[0];
+        const permitAdmin = args[1] === 'permitadmin';
 
-        if (error) {
-            console.error('Error enabling anti-sales:', error);
-            await sendMessage(sock, chatId, '⚠️ Error enabling anti-sales. Please try again later.');
-        } else {
-            await sendMessage(sock, chatId, '✅ Anti-sales has been enabled for this group.');
-        }
-    } else if (messageText.startsWith(`${currentPrefix}antisales off`)) {
-        const { error } = await supabase
-            .from('group_settings')
-            .update({ antisales_enabled: false })
-            .eq('group_id', chatId);
+        if (action === 'on') {
+            // Enable antisales
+            await enableAntiSales(chatId, permitAdmin);
+            await sendMessage(sock, chatId, `✅ Antisales has been enabled${permitAdmin ? ' with admin bypass' : ''}.`);
+        } else if (action === 'off') {
+            // Disable antisales
+            await disableAntiSales(chatId);
+            await sendMessage(sock, chatId, '✅ Antisales has been disabled.');
+        } else if (action === 'permit') {
+            const targetUser = args[1]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+            if (!targetUser) {
+                await sendMessage(sock, chatId, '⚠️ Please mention a user to permit.');
+                return;
+            }
 
-        if (error) {
-            console.error('Error disabling anti-sales:', error);
-            await sendMessage(sock, chatId, '⚠️ Error disabling anti-sales. Please try again later.');
+            const { error } = await supabase
+                .from('antisales_permissions')
+                .insert([{ group_id: chatId, user_id: targetUser }]);
+
+            if (error) {
+                console.error(`Error permitting user for antisales:`, error);
+                await sendMessage(sock, chatId, `⚠️ Failed to permit user for antisales.`);
+            } else {
+                await sendMessage(sock, chatId, `✅ User @${targetUser.split('@')[0]} is now permitted to bypass antisales.`, [targetUser]);
+            }
+        } else if (action === 'nopermit') {
+            const targetUser = args[1]?.replace('@', '').replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+            if (!targetUser) {
+                await sendMessage(sock, chatId, '⚠️ Please mention a user to revoke permission.');
+                return;
+            }
+
+            const { error } = await supabase
+                .from('antisales_permissions')
+                .delete()
+                .eq('group_id', chatId)
+                .eq('user_id', targetUser);
+
+            if (error) {
+                console.error(`Error revoking permission for user in antisales:`, error);
+                await sendMessage(sock, chatId, `⚠️ Failed to revoke permission for user in antisales.`);
+            } else {
+                await sendMessage(sock, chatId, `❌ User @${targetUser.split('@')[0]} is no longer permitted to bypass antisales.`, [targetUser]);
+            }
+        } else if (action === 'permitnot') {
+            const { error } = await supabase
+                .from('antisales_permissions')
+                .delete()
+                .eq('group_id', chatId);
+
+            if (error) {
+                console.error(`Error clearing permissions for antisales:`, error);
+                await sendMessage(sock, chatId, `⚠️ Failed to clear permissions for antisales.`);
+            } else {
+                await sendMessage(sock, chatId, `✅ All permissions for antisales have been cleared.`);
+            }
         } else {
-            await sendMessage(sock, chatId, '❌ Anti-sales has been disabled for this group.');
+            await sendMessage(sock, chatId, '⚠️ Invalid action. Use "on", "off", "permit", "nopermit", or "permitnot".');
         }
+        return;
+    }
+
+    if (command === 'listbots') {
+        console.log('Handling listbots command...');
+        await commonCommands.listBotsInGroup(sock, chatId);
+        return;
+    }
+
+    
+    
+        if (command === 'antidelete') {
+            await toggleAntiDelete(sock, chatId, sender, chatId.endsWith('@g.us'), args);
+            return;
+        }
+    
+      
+    
+        if (command === 'showallgroupstats') {
+            await showAllGroupStats(sock, chatId);
+            return;
+        
+    
+        
+    
+    
     } else if (messageText.startsWith(`${currentPrefix}tagall`)) {
         const repliedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
         const message = messageText.replace(`${currentPrefix}tagall`, '').trim();
@@ -392,8 +467,6 @@ const handleCommand = async (sock, msg) => {
         await commonCommands.sendHelpMenu(sock, chatId, true, true);
     } else if (messageText.startsWith(`${currentPrefix}joke`)) {
         await commonCommands.sendJoke(sock, chatId);
-    } else if (messageText.startsWith(`${currentPrefix}quote`)) {
-        await commonCommands.sendQuote(sock, chatId);
     } else if (messageText.startsWith(`${currentPrefix}weather`)) {
         const args = messageText.split(' ').slice(1);
         await botCommands.handleWeatherCommand(sock, msg, args);
