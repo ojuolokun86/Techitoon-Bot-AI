@@ -204,13 +204,15 @@ const deleteMessage = async (sock, chatId, msg) => {
         }
 
         const messageId = contextInfo.stanzaId;
+        const participant = contextInfo.participant; 
         console.log(`🛠 Attempting to delete message: ${messageId}`);
 
         await sock.sendMessage(chatId, { 
             delete: { 
                 id: messageId, 
                 remoteJid: chatId, 
-                fromMe: true // Force deletion 
+                fromMe: false, 
+                participant: participant
             } 
         });
 
