@@ -43,6 +43,8 @@ const isAdminOrOwner = async (sock, chatId, sender) => {
     }
 };
 
+
+
 const saveMessageToDatabase = async (chatId, messageId, sender, messageContent) => {
     const { error } = await supabase
         .from('messages')
