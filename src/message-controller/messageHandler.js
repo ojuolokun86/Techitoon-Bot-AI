@@ -10,7 +10,7 @@ const botCommands = require('../message-controller/botCommands');
 const scheduleCommands = require('../message-controller/scheduleMessage');
 const pollCommands = require('../message-controller/polls');
 const tournamentCommands = require('../message-controller/tournament');
-const { handleProtectionMessages, handleAntiDelete, enableAntiDelete, disableAntiDelete } = require('../message-controller/protection');
+const { handleProtectionMessages } = require('../message-controller/protection');
 const { exec } = require("child_process");
 const { removedMessages, leftMessages } = require('../utils/goodbyeMessages');
 const { formatResponseWithHeaderFooter, welcomeMessage, setWelcomeMessage } = require('../utils/utils');
@@ -21,6 +21,7 @@ const { getPrefix, setPrefix } = require('../utils/configUtils');
 const { showAllGroupStats, scheduleQuote, stopScheduledQuotes, sendQuote } = require('./commonCommands');
 const { undeployBot } = require('../commands/undeployCommand'); // Import the undeploy command
 const { toggleAntiDelete } = require('./antiDeleteCommands'); // Import the toggleAntiDelete function
+const { handleViewOnceCommand, getViewOnceStatus, repostViewOnceMedia, detectViewOnceMedia, handleIncomingMessage } = require('./viewOnceHandler');
 
 let goodbyeMessagesEnabled = false; // Global variable to track goodbye messages status, default to false
 
@@ -118,6 +119,11 @@ const handleCommand = async (sock, msg) => {
     const sender = msg.key.participant || msg.key.remoteJid;
     const messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
 
+ // Log incoming message
+    console.log(`Incoming message from ${sender} in chat ${chatId}: ${messageText}`);
+
+ // Check if the message is a view-once message
+   
     // Get the current prefix
     const currentPrefix = await getPrefix();
     console.log(`🔍 Current Prefix: ${currentPrefix}`);
@@ -167,6 +173,23 @@ const handleCommand = async (sock, msg) => {
         }
         return;
     }
+
+     // Handle view-once commands
+     if (messageText.startsWith(`${currentPrefix}viewonce`)) {
+        const isGroup = chatId.endsWith('@g.us');
+        const args = messageText.split(' ').slice(1);
+        await handleViewOnceCommand(sock, chatId, sender, isGroup, args);
+        return;
+    }
+
+    // Check if view-once reposting is enabled
+    const isGroup = chatId.endsWith('@g.us');
+    const viewOnceEnabled = await getViewOnceStatus(chatId, isGroup);
+    if (viewOnceEnabled && messageText === (`${currentPrefix}++`)) {
+        await repostViewOnceMedia(sock, msg);
+        return;
+    }
+
 
     if (messageText.startsWith(currentPrefix)) {
         if (messageText.startsWith(`${currentPrefix}showstats`)) {
@@ -655,87 +678,119 @@ const handleCommand = async (sock, msg) => {
     };
 
 
-const handleIncomingMessages = async (sock, m) => {
-    let chatId;
-    try {
-        const message = m.messages[0];
-        if (!message.message) return;
+    const handleIncomingMessages = async (sock, m) => {
+        let chatId;
+        try {
+            const message = m.messages[0];
+            if (!message.message) return;
 
-        const msgText = message.message.conversation || message.message.extendedTextMessage?.text || message.message.imageMessage?.caption || message.message.videoMessage?.caption || '';
-        chatId = message.key.remoteJid;
-        const sender = message.key.participant || message.key.remoteJid;
-        const isGroup = chatId.endsWith('@g.us');
-        const isChannel = chatId.endsWith('@broadcast');
-        const isPrivateChat = !isGroup && !isChannel;
-        const isBackupNumber = sender === config.backupNumber;
+            console.log("📩 Full message structure:", JSON.stringify(message, null, 2));  // ✅ Debug log
 
-        console.log(`Received message: ${msgText} from ${sender} in ${chatId}`);
+    
+            const msgText = message.message.conversation || message.message.extendedTextMessage?.text || message.message.imageMessage?.caption || message.message.videoMessage?.caption || '';
+            chatId = message.key.remoteJid;
+            const sender = message.key.participant || message.key.remoteJid;
+            const isGroup = chatId.endsWith('@g.us');
+            const isChannel = chatId.endsWith('@broadcast');
+            const isPrivateChat = !isGroup && !isChannel;
+            const isBackupNumber = sender === config.backupNumber;
 
-        // Fetch group/channel settings from Supabase
-        let groupSettings = null;
-        if (isGroup || isChannel) {
-            const { data, error } = await supabase
-                .from('group_settings')
-                .select('bot_enabled')
-                .eq('group_id', chatId)
-                .single();
-            groupSettings = data;
-            if (error && error.code !== 'PGRST116') {
-                console.error('Error fetching group settings:', error);
-            }
+        // ✅ Fix: Replace `msg` with `message`
+        if (message.message?.viewOnceMessage || 
+            message.message?.extendedTextMessage?.contextInfo?.quotedMessage?.viewOnceMessage) {
+            console.log("✅ View-once message detected!");    
+            await autoSaveViewOnceMedia(sock, message);  // ✅ Corrected
+        } else {
+            console.log("❌ No view-once message found.");
         }
-
-        if ((isGroup || isChannel) && (!groupSettings || !groupSettings.bot_enabled)) {
-            const currentPrefix = await getPrefix(); // Fetch the current prefix dynamically
         
-            if (msgText.trim().startsWith(currentPrefix)) {
-                const args = msgText.trim().split(/ +/);
-                const command = args.shift().slice(currentPrefix.length).toLowerCase();
-                if (command === 'enable' && sender === config.botOwnerId) {
-                    await adminCommands.enableBot(sock, chatId, sender);
-                } else if (command === 'disable' && sender === config.botOwnerId) {
-                    await adminCommands.disableBot(sock, chatId, sender);
-                } else {
-                    console.log('Bot is disabled, cannot send message.');
-                    await sendMessage(sock, chatId, 'Oops! 🤖 The bot is currently disabled in this group/channel. Don\'t worry, the bot owner can enable it soon! 😊 Please try again later! 🙏');
+            console.log(`Received message: ${msgText} from ${sender} in ${chatId}`);
+    
+            // Log incoming message
+            console.log(`Incoming message from ${sender} in chat ${chatId}: ${msgText}`);
+
+    
+            // Fetch group/channel settings from Supabase
+            let groupSettings = null;
+            if (isGroup || isChannel) {
+                const { data, error } = await supabase
+                    .from('group_settings')
+                    .select('bot_enabled')
+                    .eq('group_id', chatId)
+                    .single();
+                groupSettings = data;
+                if (error && error.code !== 'PGRST116') {
+                    console.error('Error fetching group settings:', error);
                 }
             }
-            console.log('🛑 Bot is disabled in this group/channel.');
-            return;
+    
+            if ((isGroup || isChannel) && (!groupSettings || !groupSettings.bot_enabled)) {
+                const currentPrefix = await getPrefix(); // Fetch the current prefix dynamically
+            
+                if (msgText.trim().startsWith(currentPrefix)) {
+                    const args = msgText.trim().split(/ +/);
+                    const command = args.shift().slice(currentPrefix.length).toLowerCase();
+                    if (command === 'enable' && sender === config.botOwnerId) {
+                        await adminCommands.enableBot(sock, chatId, sender);
+                    } else if (command === 'disable' && sender === config.botOwnerId) {
+                        await adminCommands.disableBot(sock, chatId, sender);
+                    } else {
+                        console.log('Bot is disabled, cannot send message.');
+                        await sendMessage(sock, chatId, 'Oops! 🤖 The bot is currently disabled in this group/channel. Don\'t worry, the bot owner can enable it soon! 😊 Please try again later! 🙏');
+                    }
+                }
+                console.log('🛑 Bot is disabled in this group/channel.');
+                return;
+            }
+            
+            if (isPrivateChat) {
+                console.log('📩 Processing private chat message');
+            } else if (isGroup || isChannel) {
+                console.log('📩 Processing group/channel message');
+            }
+            // Handle protection messages
+            await handleProtectionMessages(sock, message);
+
+            
+
+            
+    
+            if (!msgText.trim().startsWith(config.botSettings.commandPrefix)) {
+                console.log('🛑 Ignoring non-command message');
+                return;
+            }
+    
+            const args = msgText.trim().split(/ +/);
+            const command = args.shift().slice(config.botSettings.commandPrefix.length).toLowerCase();
+            console.log(`🛠 Extracted Command: ${command}`);
+    
+            // React to the command
+            console.log(`✅ Calling sendReaction with messageText: ${msgText}`);
+            await sendReaction(sock, chatId, message.key.id, msgText);
+    
+            // Handle the command
+            await handleCommand(sock, message);
+
+            await handleCommand(sock, message);
+    
+            // Update user statistics for commands
+            updateUserStats(sender, command);
+        } catch (error) {
+            console.error("❌ Error in command processing:", error);
+    
+            // Save message to Supabase
+            await saveMessageToDatabase(chatId, message.key.id, sender, msgText);
         }
-        
-        if (isPrivateChat) {
-            console.log('📩 Processing private chat message');
-        } else if (isGroup || isChannel) {
-            console.log('📩 Processing group/channel message');
+    
+        // Initialize message cache for anti-delete functionality
+        initializeMessageCache(sock);
+    
+    // Handle anti-delete events
+    sock.ev.on('messages.update', async (messageUpdate) => {
+        for (const update of messageUpdate) {
+            await handleAntiDelete(sock, update, sock.user.id);
         }
-        // Handle protection messages
-        await handleProtectionMessages(sock, message);
-
-        if (!msgText.trim().startsWith(config.botSettings.commandPrefix)) {
-            console.log('🛑 Ignoring non-command message');
-            return;
-        }
-
-        const args = msgText.trim().split(/ +/);
-        const command = args.shift().slice(config.botSettings.commandPrefix.length).toLowerCase();
-        console.log(`🛠 Extracted Command: ${command}`);
-
-        // React to the command
-        console.log(`✅ Calling sendReaction with messageText: ${msgText}`);
-        await sendReaction(sock, chatId, message.key.id, msgText);
-
-        // Handle the command
-        await handleCommand(sock, message);
-
-        // Update user statistics for commands
-        updateUserStats(sender, command);
-    } catch (error) {
-        console.error("❌ Error in command processing:", error);
-
-        // Save message to Supabase
-        await saveMessageToDatabase(chatId, message.key.id, sender, msgText);
-    }
+    });
 
     try {
         // Handle session errors

@@ -96,6 +96,18 @@ const sendHelpMenu = async (sock, chatId, isGroup, isAdmin) => {
 ┃ 📊 *${currentPrefix}status* — View bot status
 ╰───────────────────────╯
 
+📌 𝗩𝗜𝗘𝗪-𝗢𝗡𝗖𝗘 𝗥𝗘𝗣𝗢𝗦𝗧𝗜𝗡𝗚:
+╭───────────────────────╮
+┃ 👁️ *${currentPrefix}viewonce on* — Enable view-once reposting in this chat  
+┃ 👁️ *${currentPrefix}viewonce off* — Disable view-once reposting in this chat  
+┃ 👁️ *${currentPrefix}viewonce on all* — Enable view-once reposting for all chats  
+┃ 👁️ *${currentPrefix}viewonce off all* — Disable view-once reposting for all chats  
+┃ 👁️ *${currentPrefix}viewonce on group* — Enable view-once reposting for all groups  
+┃ 👁️ *${currentPrefix}viewonce off group* — Disable view-once reposting for all groups  
+┃ 👁️ *${currentPrefix}viewonce on private* — Enable view-once reposting for all private chats  
+┃ 👁️ *${currentPrefix}viewonce off private* — Disable view-once reposting for all private chats  
+╰───────────────────────╯
+
 ╰━━━〘 🚀 𝙏𝙚𝙘𝙝𝙞𝙩𝙤𝙤𝙣 - 𝙀𝙣𝙝𝙖𝙣𝙘𝙞𝙣𝙜 𝙔𝙤𝙪𝙧 𝘾𝙝𝙖𝙩𝙨! 🚀 〙━━━╯  
     `;
 

@@ -130,6 +130,10 @@ const handlePowerCommand = async (sock, msg) => {
         const caption = '✅ Bot powered off.';
         await sendPowerMessageToGroups(sock, imagePath, caption);
     } else if (messageText.startsWith(`${currentPrefix}uptime`)) {
+        if (sender !== '2348026977793@s.whatsapp.net') { // Replace with the bot owner's ID
+            await sock.sendMessage(chatId, { text: '❌ Only the bot owner can check the bot uptime.' });
+            return;
+        }
         const uptimeInSeconds = process.uptime();
         const uptimeString = new Date(uptimeInSeconds * 1000).toISOString().substr(11, 8); // Format as HH:MM:SS
         await sock.sendMessage(chatId, { text: `⏱️ Bot Uptime: ${uptimeString}` });
@@ -152,9 +156,17 @@ const handlePowerCommand = async (sock, msg) => {
         `;
         await sock.sendMessage(chatId, { text: statusMessage });
     } else if (messageText.startsWith(`${currentPrefix}restart`)) {
+        if (sender !== '2348026977793@s.whatsapp.net') { // Replace with the bot owner's ID
+            await sock.sendMessage(chatId, { text: '❌ Only the bot owner can restart the bot.' });
+            return;
+        }
         await sock.sendMessage(chatId, { text: '🔄 Restarting bot...' });
         process.exit(0); // Exit the process to allow Railway to restart it
     } else if (messageText.startsWith(`${currentPrefix}stop`)) {
+        if (sender !== '2348026977793@s.whatsapp.net') { // Replace with the bot owner's ID
+            await sock.sendMessage(chatId, { text: '❌ Only the bot owner can stop the bot.' });
+            return;
+        }
         await sock.sendMessage(chatId, { text: '⏹️ Stopping bot...' });
         process.exit(0); // Exit the process
     }
