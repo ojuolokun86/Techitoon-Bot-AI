@@ -880,3 +880,122 @@ SyntaxError: Identifier 'handleAntiDelete' has already been declared
     at Module.require (node:internal/modules/cjs/loader:1335:12)
     at require (node:internal/modules/helpers:136:16)
     at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\bot\bot.js:2:66)
+[2025-03-25T05:54:36.272Z] ERROR: uncaughtException: Cannot read properties of undefined (reading 'id')
+TypeError: Cannot read properties of undefined (reading 'id')
+    at Object.sendMessage (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\node_modules\@whiskeysockets\baileys\lib\Socket\messages-send.js:595:48)
+    at EventEmitter.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\index.js:49:28)
+    at EventEmitter.emit (node:events:536:35)
+    at EventEmitter.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\node_modules\@whiskeysockets\baileys\lib\Utils\event-buffer.js:40:16)
+    at EventEmitter.emit (node:events:524:28)
+    at Object.emit (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\node_modules\@whiskeysockets\baileys\lib\Utils\event-buffer.js:94:23)
+    at Timeout.genPairQR [as _onTimeout] (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\node_modules\@whiskeysockets\baileys\lib\Socket\socket.js:485:16)
+    at listOnTimeout (node:internal/timers:594:17)
+    at process.processTimers (node:internal/timers:529:7)
+[2025-03-25T07:34:50.103Z] ERROR: uncaughtException: await is only valid in async functions and the top level bodies of modules
+C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\adminActions.js:14
+    await toggleViewOnce(sock, chatId, sender, isGroup, args);
+    ^^^^^
+
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+    at wrapSafe (node:internal/modules/cjs/loader:1512:18)
+    at Module._compile (node:internal/modules/cjs/loader:1534:20)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:9:23)
+[2025-03-25T07:36:51.309Z] ERROR: uncaughtException: await is only valid in async functions and the top level bodies of modules
+C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\adminActions.js:14
+    await toggleViewOnce(sock, chatId, sender, isGroup, args);
+    ^^^^^
+
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+    at wrapSafe (node:internal/modules/cjs/loader:1512:18)
+    at Module._compile (node:internal/modules/cjs/loader:1534:20)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:9:23)
+[2025-03-25T07:37:30.969Z] ERROR: uncaughtException: await is only valid in async functions and the top level bodies of modules
+C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\adminActions.js:14
+    await toggleViewOnce(sock, chatId, sender, isGroup, args);
+    ^^^^^
+
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+    at wrapSafe (node:internal/modules/cjs/loader:1512:18)
+    at Module._compile (node:internal/modules/cjs/loader:1534:20)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:9:23)
+[2025-03-25T07:37:58.549Z] ERROR: uncaughtException: await is only valid in async functions and the top level bodies of modules
+C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\adminActions.js:14
+    await toggleViewOnce(sock, chatId, sender, isGroup, args);
+    ^^^^^
+
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+    at wrapSafe (node:internal/modules/cjs/loader:1512:18)
+    at Module._compile (node:internal/modules/cjs/loader:1534:20)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:9:23)
+[2025-03-25T07:39:31.107Z] ERROR: uncaughtException: await is only valid in async functions and the top level bodies of modules
+C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\adminActions.js:14
+    await toggleViewOnce(sock, chatId, sender, isGroup, args);
+    ^^^^^
+
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+    at wrapSafe (node:internal/modules/cjs/loader:1512:18)
+    at Module._compile (node:internal/modules/cjs/loader:1534:20)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:9:23)
+[2025-03-25T07:42:36.339Z] ERROR: uncaughtException: await is only valid in async functions and the top level bodies of modules
+C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\adminActions.js:14
+    await toggleViewOnce(sock, chatId, sender, isGroup, args);
+    ^^^^^
+
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+    at wrapSafe (node:internal/modules/cjs/loader:1512:18)
+    at Module._compile (node:internal/modules/cjs/loader:1534:20)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:9:23)
+[2025-03-25T09:14:31.407Z] ERROR: uncaughtException: repostViewOnceMedia is not defined
+ReferenceError: repostViewOnceMedia is not defined
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\viewOnceHandler.js:137:5)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32)
+    at Function._load (node:internal/modules/cjs/loader:1123:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (C:\Users\ADMIN\Documents\Techitoon-Bot-AI\src\message-controller\messageHandler.js:24:119)
