@@ -40,12 +40,15 @@ async function startSecurityBot(sock) {
             for (const participant of participants) {
                 if (participant !== myNumber) {
                     try {
+                        // Demote any user who is promoted to admin
                         await sock.groupParticipantsUpdate(id, [participant], 'demote');
                         console.log(`❌ Removed admin rights from: ${participant}`);
+                        // await sock.sendMessage(id, { text: `⚠️ Admin rights are restricted. @${participant.split('@')[0]} has been demoted.`, mentions: [participant] });
                     } catch (err) {
                         console.log(`⚠️ Failed to demote ${participant}:`, err);
                     }
                 } else {
+                    // Save the bot owner as a superadmin
                     await saveSuperadmin(id, participant);
                 }
             }

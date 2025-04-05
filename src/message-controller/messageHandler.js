@@ -114,6 +114,50 @@ const disableAntiSales = async (chatId) => {
     }
 };
 
+const setGroupInfo = async (sock, chatId, sender, args) => {
+    try {
+        const isAdmin = await checkIfAdmin(sock, chatId, sender);
+        if (!isAdmin) {
+            await sendMessage(sock, chatId, '❌ You must be an admin to change the group description.');
+            return;
+        }
+
+        const newDescription = args.join(' ').trim();
+        if (!newDescription) {
+            await sendMessage(sock, chatId, '⚠️ Please provide a new group description.');
+            return;
+        }
+
+        await sock.groupUpdateDescription(chatId, newDescription);
+        await sendMessage(sock, chatId, '✅ Group description updated successfully.');
+    } catch (error) {
+        console.error('Error updating group description:', error);
+        await sendMessage(sock, chatId, '⚠️ Failed to update group description.');
+    }
+};
+
+const setGroupName = async (sock, chatId, sender, args) => {
+    try {
+        const isAdmin = await checkIfAdmin(sock, chatId, sender);
+        if (!isAdmin) {
+            await sendMessage(sock, chatId, '❌ You must be an admin to change the group name.');
+            return;
+        }
+
+        const newName = args.join(' ').trim();
+        if (!newName) {
+            await sendMessage(sock, chatId, '⚠️ Please provide a new group name.');
+            return;
+        }
+
+        await sock.groupUpdateSubject(chatId, newName);
+        await sendMessage(sock, chatId, '✅ Group name updated successfully.');
+    } catch (error) {
+        console.error('Error updating group name:', error);
+        await sendMessage(sock, chatId, '⚠️ Failed to update group name.');
+    }
+};
+
 const handleCommand = async (sock, msg) => {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
@@ -236,6 +280,16 @@ const handleCommand = async (sock, msg) => {
     // Call sendReaction to send a reaction for the command
     console.log(`✅ Sending Reaction for Command: ${command}`);
     await sendReaction(sock, chatId, msg.key.id, messageText);
+
+    if (command === 'setgroupinfo') {
+        await setGroupInfo(sock, chatId, sender, args);
+        return;
+    }
+
+    if (command === 'setgroupname') {
+        await setGroupName(sock, chatId, sender, args);
+        return;
+    }
 
     if (command === "setfont") {
         const fontName = args[0];
@@ -1018,7 +1072,9 @@ module.exports = {
     setupDebugging: setupDebugging,
     addWinner: addWinner,
     showHallOfFame: showHallOfFame,
-    handlePollCommand: handlePollCommand
+    handlePollCommand: handlePollCommand,
+    setGroupInfo: setGroupInfo,
+    setGroupName: setGroupName,
 };
 
 console.log("✅ messageHandler.js is fully exported:", module.exports);
